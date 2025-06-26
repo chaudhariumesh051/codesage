@@ -982,4 +982,4 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onSuccess
       </motion.div>
     </AnimatePresence>
   );
-}
+};
