@@ -142,81 +142,95 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onSuccess
 
     setIsLoading(true);
 
-    try {
-      switch (mode) {
-        case 'signin':
-          await AuthService.signIn({
-            email: formData.email,
-            password: formData.password
-          });
-          showToast.success('Welcome back! 🎉');
-          onSuccess();
-          break;
+try {
+  switch (mode) {
+    case 'signin':
+      await AuthService.signIn({
+        email: formData.email,
+        password: formData.password
+      });
+      showToast.success('Welcome back! 🎉');
+      onSuccess();
+      break;
 
-        case 'signup':
-          const result = await AuthService.signUp({
-            email: formData.email,
-            password: formData.password,
-            full_name: formData.fullName
-          });
-          
-          if (result.needsVerification) {
-            showToast.info('Please check your email to verify your account');
-          } else {
-            showToast.success('Account created successfully! 🎉');
-            onSuccess();
-          }
-          break;
-
-        case 'forgot-password':
-          await AuthService.resetPassword(formData.email);
-          showToast.success('Password reset email sent! Please check your inbox.');
-          setMode('signin');
-          break;
-
-        case 'magic-link':
-          await AuthService.signInWithMagicLink(formData.email);
-          showToast.success('Magic link sent! Please check your email.');
-          onClose();
-          break;
-
-        case 'otp':
-          await AuthService.signInWithOTP(formData.phone);
-          setMode('verify-otp');
-          break;
-
-        case 'verify-otp':
-          await AuthService.verifyOTP(formData.phone, formData.otp);
-          showToast.success('Successfully verified! 🎉');
-          onSuccess();
-          break;
-      }
-    } catch (error: any) {
-      console.error('Auth error:', error);
+    case 'signup':
+      const result = await AuthService.signUp({
+        email: formData.email,
+        password: formData.password,
+        full_name: formData.fullName
+      });
       
-      // Handle rate limit errors specifically
-      if (error.message.includes('wait') && error.message.includes('seconds')) {
-        const waitTime = parseRateLimitError(error.message);
-        setRateLimitCooldown(waitTime);
-        showToast.error(`Rate limit exceeded. Please wait ${waitTime} seconds before trying again.`);
-      } else {
-        showToast.error(error.message || 'Authentication failed. Please try again.');
+      if (result.user?.identities?.length === 0) {
+        showToast.info('User already exists. Please sign in.');
+        setMode('signin');
+      } else if (result.user) {
+        showToast.success('Account created successfully! Please check your email for verification.');
+        onSuccess();
       }
-      
-      // Set specific error messages
-      if (error.message.includes('password')) {
-        setErrors(prev => ({ ...prev, password: error.message }));
-      } else if (error.message.includes('email')) {
-        setErrors(prev => ({ ...prev, email: error.message }));
-      } else if (error.message.includes('phone')) {
-        setErrors(prev => ({ ...prev, phone: error.message }));
-      } else if (error.message.includes('OTP')) {
-        setErrors(prev => ({ ...prev, otp: error.message }));
-      }
-    } finally {
-      setIsLoading(false);
-    }
-  };
+      break;
+
+    case 'forgot-password':
+      await AuthService.resetPassword(formData.email);
+      showToast.success('Password reset email sent! Please check your inbox.');
+      setMode('signin');
+      break;
+
+    case 'magic-link':
+      await AuthService.signInWithMagicLink(formData.email);
+      showToast.success('Magic link sent! Please check your email.');
+      onClose();
+      break;
+
+    case 'otp':
+      await AuthService.signInWithOTP(formData.phone);
+      showToast.success('OTP sent to your phone!');
+      setMode('verify-otp');
+      break;
+
+    case 'verify-otp':
+      await AuthService.verifyOTP(formData.phone, formData.otp);
+      showToast.success('Successfully verified! 🎉');
+      onSuccess();
+      break;
+  }
+} catch (error: any) {
+  console.error('Auth error:', error);
+  
+  // Handle rate limit errors
+  if (error.message.includes('rate limit') || error.message.includes('too many requests')) {
+    const waitTime = parseRateLimitError(error.message);
+    setRateLimitCooldown(waitTime);
+    showToast.error(`Too many attempts. Please wait ${waitTime} seconds before trying again.`);
+    return;
+  }
+
+  // Handle specific error cases
+  let errorMessage = error.message || 'Authentication failed. Please try again.';
+  
+  if (error.message.includes('Invalid login credentials')) {
+    errorMessage = 'Invalid email or password. Please try again.';
+    setErrors({ password: errorMessage });
+  } else if (error.message.includes('Email not confirmed')) {
+    errorMessage = 'Please verify your email address first. Check your inbox.';
+    setErrors({ email: errorMessage });
+  } else if (error.message.includes('User already registered')) {
+    errorMessage = 'Email already in use. Please sign in instead.';
+    setMode('signin');
+    setErrors({ email: errorMessage });
+  } else if (error.message.includes('password')) {
+    setErrors({ password: error.message });
+  } else if (error.message.includes('email')) {
+    setErrors({ email: error.message });
+  } else if (error.message.includes('phone')) {
+    setErrors({ phone: error.message });
+  } else if (error.message.includes('OTP')) {
+    setErrors({ otp: error.message });
+  }
+
+  showToast.error(errorMessage);
+} finally {
+  setIsLoading(false);
+}
 
   const handleSocialSignIn = async (provider: 'github' | 'google') => {
     try {
