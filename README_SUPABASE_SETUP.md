@@ -1,261 +1,61 @@
-# CodeSage Supabase Backend Setup Guide
+# Supabase Setup Instructions
 
-This guide will help you set up the complete Supabase backend for the CodeSage platform with authentication, database, and subscription management.
+## Getting Your Supabase Credentials
 
-## 🚀 Quick Setup
+To fix the "Invalid API key" errors, you need to get your actual Supabase project credentials:
 
-### 1. Create Supabase Project
+### Step 1: Access Your Supabase Dashboard
+1. Go to [https://supabase.com/dashboard](https://supabase.com/dashboard)
+2. Sign in to your account
+3. Select your project (or create a new one if you don't have one)
 
-1. Go to [Supabase](https://supabase.com) and create a new project
-2. Wait for the project to be fully provisioned
-3. Note down your project URL and anon key from Settings > API
+### Step 2: Get Your API Keys
+1. In your project dashboard, click on the **Settings** icon in the left sidebar
+2. Click on **API** in the settings menu
+3. You'll see your project credentials:
+   - **Project URL**: This is your `VITE_SUPABASE_URL`
+   - **Project API keys**:
+     - **anon public**: This is your `VITE_SUPABASE_ANON_KEY`
+     - **service_role secret**: This is your `SUPABASE_SERVICE_ROLE_KEY`
 
-### 2. Environment Variables
+### Step 3: Update Your Environment Variables
+1. Open your `.env` file in the project root
+2. Replace the placeholder values with your actual credentials:
 
-Create a `.env` file in your project root:
-
-```bash
-# Copy from .env.example and fill in your values
-VITE_SUPABASE_URL=https://your-project.supabase.co
-VITE_SUPABASE_ANON_KEY=your_anon_key_here
-VITE_GEMINI_API_KEY=your_gemini_api_key
-VITE_TAVUS_API_KEY=your_tavus_api_key
-VITE_REVENUECAT_API_KEY=your_revenuecat_api_key
+```env
+VITE_SUPABASE_URL=https://your-project-ref.supabase.co
+VITE_SUPABASE_ANON_KEY=your-actual-anon-key-here
+SUPABASE_SERVICE_ROLE_KEY=your-actual-service-role-key-here
 ```
 
-### 3. Run Database Migrations
+### Step 4: Restart Your Development Server
+After updating the `.env` file:
+1. Stop your development server (Ctrl+C)
+2. Start it again with `npm run dev`
 
-Execute the migration files in order:
+## Security Notes
 
-```bash
-# In your Supabase SQL Editor, run these files in order:
-1. supabase/migrations/create_auth_system.sql
-2. supabase/migrations/create_code_analysis_system.sql
-3. supabase/migrations/create_challenges_system.sql
-4. supabase/migrations/create_media_storage.sql
-5. supabase/migrations/create_subscription_system.sql
-```
+- **Never commit your `.env` file to version control**
+- The `anon` key is safe to use in client-side code
+- The `service_role` key should only be used server-side (in edge functions)
+- Keep your `service_role` key secret as it has admin privileges
 
-### 4. Set up Storage Buckets
+## Troubleshooting
 
-In Supabase Dashboard > Storage, create these buckets:
+If you're still getting authentication errors:
 
-```sql
--- Create storage buckets
-INSERT INTO storage.buckets (id, name, public) VALUES 
-('flowcharts', 'flowcharts', true),
-('videos', 'videos', true),
-('audio', 'audio', true),
-('exports', 'exports', false);
+1. **Double-check your credentials**: Make sure you copied the keys correctly
+2. **Check for extra spaces**: Ensure there are no leading/trailing spaces in your keys
+3. **Verify project status**: Make sure your Supabase project is active and not paused
+4. **Clear browser cache**: Sometimes cached credentials can cause issues
 
--- Set up storage policies
-CREATE POLICY "Users can upload own files" ON storage.objects
-FOR INSERT TO authenticated
-WITH CHECK (auth.uid()::text = (storage.foldername(name))[1]);
+## Phone Authentication Setup
 
-CREATE POLICY "Users can view own files" ON storage.objects
-FOR SELECT TO authenticated
-USING (auth.uid()::text = (storage.foldername(name))[1]);
+This project includes phone number authentication with country code selection. To enable SMS authentication:
 
-CREATE POLICY "Users can update own files" ON storage.objects
-FOR UPDATE TO authenticated
-USING (auth.uid()::text = (storage.foldername(name))[1]);
+1. In your Supabase dashboard, go to **Authentication** > **Settings**
+2. Enable **Phone** provider
+3. Configure your SMS provider (Twilio, etc.)
+4. Update your authentication settings as needed
 
-CREATE POLICY "Users can delete own files" ON storage.objects
-FOR DELETE TO authenticated
-USING (auth.uid()::text = (storage.foldername(name))[1]);
-```
-
-### 5. Deploy Edge Functions
-
-```bash
-# Install Supabase CLI
-npm install -g supabase
-
-# Login to Supabase
-supabase login
-
-# Link your project
-supabase link --project-ref your-project-ref
-
-# Deploy edge functions
-supabase functions deploy revenuecat-webhook
-supabase functions deploy auth-hooks
-```
-
-### 6. Configure Authentication
-
-In Supabase Dashboard > Authentication > Settings:
-
-1. **Email Templates**: Customize signup, reset password, and magic link emails
-2. **URL Configuration**: Set site URL and redirect URLs
-3. **Auth Providers**: Enable email/password, magic links, and SMS OTP
-4. **Security**: Configure password requirements and session settings
-
-### 7. Set up RevenueCat Integration
-
-1. Create a RevenueCat account and project
-2. Configure webhook URL: `https://your-project.supabase.co/functions/v1/revenuecat-webhook`
-3. Add webhook secret to environment variables
-4. Configure products in RevenueCat dashboard
-
-## 📊 Database Schema Overview
-
-### Core Tables
-
-- **user_profiles**: Extended user information and subscription status
-- **user_sessions**: Multi-device session tracking
-- **user_security_logs**: Security events and audit trail
-- **code_submissions**: User code submissions and analysis requests
-- **code_analyses**: AI analysis results and insights
-- **problem_solutions**: Generated solutions for coding problems
-- **challenges**: Coding challenges and problems
-- **user_progress**: User progress tracking and achievements
-- **video_generations**: AI video generation requests and results
-- **subscription_plans**: Available subscription plans
-- **user_subscriptions**: User subscription records
-
-### Key Features
-
-✅ **Secure Authentication**
-- Email/password, magic links, SMS OTP
-- Multi-device session tracking
-- Brute force protection
-- Security audit logging
-
-✅ **Code Analysis System**
-- Code submission tracking
-- AI analysis results storage
-- Execution history
-- Flowchart generation
-
-✅ **Challenge System**
-- Coding challenges
-- Progress tracking
-- Achievement system
-- Learning paths
-
-✅ **Media Storage**
-- Video file management
-- Flowchart exports
-- Voice narrations
-- Secure file access
-
-✅ **Subscription Management**
-- RevenueCat integration
-- Webhook processing
-- Billing history
-- Usage tracking
-
-## 🔒 Security Features
-
-### Row Level Security (RLS)
-All tables have RLS enabled with policies ensuring users can only access their own data.
-
-### Rate Limiting
-Built-in rate limiting for free users:
-- Code analysis: 3 per day
-- Problem solving: 3 per day
-- Video generation: Pro only
-
-### Session Management
-- JWT-based authentication
-- Multi-device tracking
-- Session revocation
-- Automatic cleanup
-
-### Audit Logging
-Complete audit trail for:
-- Login attempts
-- Password resets
-- Account changes
-- Security events
-
-## 🔧 API Usage Examples
-
-### Authentication
-
-```typescript
-import { AuthService } from './src/services/auth'
-
-// Sign up
-await AuthService.signUp({
-  email: 'user@example.com',
-  password: 'securepassword',
-  full_name: 'John Doe'
-})
-
-// Sign in
-await AuthService.signIn({
-  email: 'user@example.com',
-  password: 'securepassword'
-})
-
-// Magic link
-await AuthService.signInWithMagicLink('user@example.com')
-
-// SMS OTP
-await AuthService.signInWithOTP('+1234567890')
-```
-
-### Database Operations
-
-```typescript
-import { DatabaseService } from './src/services/database'
-
-// Create code submission
-const submissionId = await DatabaseService.createCodeSubmission({
-  title: 'Binary Search Implementation',
-  code_content: 'function binarySearch...',
-  language: 'javascript',
-  submission_type: 'analysis'
-})
-
-// Save analysis result
-await DatabaseService.saveAnalysisResult({
-  submission_id: submissionId,
-  summary: 'Well-implemented binary search',
-  score: 85,
-  time_complexity: 'O(log n)',
-  space_complexity: 'O(1)',
-  bugs: [],
-  optimizations: ['Add input validation']
-})
-```
-
-## 🎯 Next Steps
-
-1. **Test the Setup**: Run the application and test authentication flows
-2. **Configure AI Services**: Set up Gemini and Tavus API keys
-3. **Set up RevenueCat**: Configure subscription products and webhooks
-4. **Customize**: Modify the schema and policies as needed for your use case
-5. **Deploy**: Deploy your application with the Supabase backend
-
-## 📚 Additional Resources
-
-- [Supabase Documentation](https://supabase.com/docs)
-- [RevenueCat Documentation](https://docs.revenuecat.com)
-- [Row Level Security Guide](https://supabase.com/docs/guides/auth/row-level-security)
-- [Edge Functions Guide](https://supabase.com/docs/guides/functions)
-
-## 🆘 Troubleshooting
-
-### Common Issues
-
-1. **RLS Policies**: Make sure RLS is enabled and policies are correctly configured
-2. **Environment Variables**: Verify all required environment variables are set
-3. **Migrations**: Run migrations in the correct order
-4. **Storage Buckets**: Ensure buckets are created with correct policies
-5. **Edge Functions**: Check function logs for deployment issues
-
-### Support
-
-If you encounter issues:
-1. Check the Supabase logs in your dashboard
-2. Verify your environment variables
-3. Test API endpoints individually
-4. Check the browser console for client-side errors
-
----
-
-🎉 **Congratulations!** You now have a fully functional, secure, and scalable backend for your CodeSage platform!
+The `PhoneInput` and `CountryCodeSelector` components are ready to use for phone-based authentication.
