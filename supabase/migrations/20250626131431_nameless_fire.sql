@@ -216,6 +216,16 @@ CREATE POLICY "Admins can view all security logs"
     )
   );
 
+CREATE POLICY "Users can insert their own security logs"
+  ON user_security_logs FOR INSERT
+  TO authenticated
+  USING (auth.uid() = user_id);
+
+CREATE POLICY "Service role can insert security logs"
+  ON user_security_logs FOR INSERT
+  TO service_role
+  USING (true);
+
 -- RLS Policies for user_preferences
 CREATE POLICY "Users can manage own preferences"
   ON user_preferences FOR ALL
