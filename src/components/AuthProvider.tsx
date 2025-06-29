@@ -32,83 +32,88 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [initialAuthMode, setInitialAuthMode] = useState<'signin' | 'signup' | 'forgot-password'>('signin');
 
   useEffect(() => {
-    // Check for active session on mount
-    checkUser();
+    let mounted = true;
 
-    // Set up auth state listener
-    const { data: authListener } = supabase.auth.onAuthStateChange(async (event, session) => {
-      console.log('Auth state changed:', event);
-      
-      if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
-        if (session?.user) {
-          setUser(session.user);
-          const profile = await fetchUserProfile(session.user.id);
-          setProfile(profile);
-        }
-      } else if (event === 'SIGNED_OUT') {
-        setUser(null);
-        setProfile(null);
-      } else if (event === 'USER_UPDATED') {
-        if (session?.user) {
-          setUser(session.user);
-          const profile = await fetchUserProfile(session.user.id);
-          setProfile(profile);
-        }
-      }
-    });
-
-    return () => {
-      authListener.subscription.unsubscribe();
-    };
-  }, []);
-
-  const checkUser = async () => {
-    try {
-      setIsLoading(true);
-      
-      // First try to get the current session
-      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
-      
-      if (sessionError) {
-        console.warn('Session error:', sessionError);
-        // Clear any corrupted session data
-        await supabase.auth.signOut();
-        return;
-      }
-      
-      if (session?.user) {
-        setUser(session.user);
-        const profile = await fetchUserProfile(session.user.id);
-        setProfile(profile);
-      } else {
-        // Try to get user if session is null but there might be a valid token
-        const { data: { user }, error: userError } = await supabase.auth.getUser();
+    const initializeAuth = async () => {
+      try {
+        console.log('Initializing auth...');
         
-        if (userError) {
-          console.warn('User error:', userError);
-          // Clear any corrupted auth data
-          await supabase.auth.signOut();
+        // Get initial session
+        const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+        
+        if (sessionError) {
+          console.warn('Session error:', sessionError);
+          if (mounted) {
+            setIsLoading(false);
+          }
           return;
         }
         
-        if (user) {
-          setUser(user);
-          const profile = await fetchUserProfile(user.id);
-          setProfile(profile);
+        if (session?.user && mounted) {
+          console.log('Found existing session for user:', session.user.id);
+          setUser(session.user);
+          
+          // Load user profile
+          try {
+            const profile = await fetchUserProfile(session.user.id);
+            if (mounted) {
+              setProfile(profile);
+            }
+          } catch (profileError) {
+            console.warn('Error loading profile:', profileError);
+          }
+        }
+        
+        if (mounted) {
+          setIsLoading(false);
+        }
+      } catch (error) {
+        console.error('Auth initialization error:', error);
+        if (mounted) {
+          setIsLoading(false);
         }
       }
-    } catch (error) {
-      console.error('Error checking user:', error);
-      // Clear any corrupted auth data on error
+    };
+
+    // Initialize auth
+    initializeAuth();
+
+    // Set up auth state listener
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      console.log('Auth state changed:', event, session?.user?.id);
+      
+      if (!mounted) return;
+      
       try {
-        await supabase.auth.signOut();
-      } catch (signOutError) {
-        console.warn('Error during cleanup signout:', signOutError);
+        if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
+          if (session?.user) {
+            setUser(session.user);
+            const profile = await fetchUserProfile(session.user.id);
+            setProfile(profile);
+          }
+        } else if (event === 'SIGNED_OUT') {
+          setUser(null);
+          setProfile(null);
+        } else if (event === 'USER_UPDATED') {
+          if (session?.user) {
+            setUser(session.user);
+            const profile = await fetchUserProfile(session.user.id);
+            setProfile(profile);
+          }
+        }
+      } catch (error) {
+        console.error('Auth state change error:', error);
       }
-    } finally {
+      
+      // Always ensure loading is false after auth state changes
       setIsLoading(false);
-    }
-  };
+    });
+
+    return () => {
+      mounted = false;
+      subscription.unsubscribe();
+    };
+  }, []);
 
   const fetchUserProfile = async (userId: string) => {
     try {
@@ -163,8 +168,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const handleAuthSuccess = () => {
     setShowAuthModal(false);
-    checkUser();
+    // Don't manually refresh here - let the auth state listener handle it
   };
+
+  const isAuthenticated = !!user;
 
   return (
     <AuthContext.Provider
@@ -172,7 +179,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         user,
         profile,
         isLoading,
-        isAuthenticated: !!user,
+        isAuthenticated,
         openAuthModal,
         signOut,
         refreshUser
