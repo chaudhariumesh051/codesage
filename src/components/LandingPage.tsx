@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect } from "react";
 import { motion, useScroll, useTransform } from "framer-motion";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "./AuthProvider";
@@ -30,8 +30,14 @@ export const LandingPage: React.FC = () => {
   const y2 = useTransform(scrollY, [0, 300], [0, -100]);
   const opacity = useTransform(scrollY, [0, 300], [1, 0.5]);
 
+  // Check if user is already authenticated and redirect if needed
+  useEffect(() => {
+    if (!isLoading && isAuthenticated) {
+      navigate("/dashboard");
+    }
+  }, [isAuthenticated, isLoading, navigate]);
+
   const handleGetStarted = () => {
-    // Don't check loading state here - just handle the action
     if (isAuthenticated) {
       navigate("/dashboard");
     } else {
@@ -131,6 +137,11 @@ export const LandingPage: React.FC = () => {
         "https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=64&h=64&fit=crop&crop=face",
     },
   ];
+
+  // If still loading, show nothing to prevent flash
+  if (isLoading) {
+    return null;
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 text-white overflow-hidden">

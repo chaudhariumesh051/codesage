@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from './AuthProvider';
 import { useTheme } from '../contexts/ThemeContext';
+import { useNavigate } from 'react-router-dom';
 import type { ViewType } from '../App';
 
 interface NavbarProps {
@@ -27,11 +28,10 @@ export const Navbar: React.FC<NavbarProps> = ({
   currentView,
   setCurrentView
 }) => {
-  const { user, profile, signOut, isAuthenticated } = useAuth();
+  const { user, profile, signOut, isAuthenticated, isAdmin } = useAuth();
   const { isDark, toggleTheme } = useTheme();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-
-  const isAdmin = profile?.is_admin === true;
+  const navigate = useNavigate();
 
   const menuItems = [
     { id: 'dashboard' as ViewType, label: 'Dashboard', icon: BarChart3, color: 'text-indigo-500' },
@@ -53,6 +53,18 @@ export const Navbar: React.FC<NavbarProps> = ({
 
   const handleSignOut = async () => {
     await signOut();
+    navigate('/');
+  };
+
+  const handleViewChange = (view: ViewType) => {
+    setCurrentView(view);
+    
+    // If changing to admin view, navigate to admin route
+    if (view === 'admin') {
+      navigate('/admin');
+    } else {
+      navigate('/dashboard');
+    }
   };
 
   return (
@@ -85,7 +97,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                   key={item.id}
                   whileHover={{ scale: 1.05 }}
                   whileTap={{ scale: 0.95 }}
-                  onClick={() => setCurrentView(item.id)}
+                  onClick={() => handleViewChange(item.id)}
                   className={`flex items-center space-x-2 px-4 py-2 rounded-lg transition-all ${
                     isActive
                       ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-400'
@@ -121,7 +133,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                 >
                   <div className="hidden md:block text-right">
                     <p className="text-sm font-semibold text-gray-900 dark:text-gray-100">{profile?.full_name || user?.email}</p>
-                    <p className="text-xs text-gray-500 dark:text-gray-400">{profile?.is_admin ? 'Admin' : 'User'}</p>
+                    <p className="text-xs text-gray-500 dark:text-gray-400">{profile?.is_admin || user?.email === 'admin@gmail.com' ? 'Admin' : 'User'}</p>
                   </div>
                   <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-600 rounded-xl flex items-center justify-center">
                     {profile?.avatar_url ? (
@@ -140,7 +152,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                 <div className="absolute right-0 mt-2 w-48 bg-white dark:bg-dark-800 rounded-xl shadow-lg border border-gray-200 dark:border-dark-700 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 transform origin-top-right">
                   <div className="p-2">
                     <button
-                      onClick={() => setCurrentView('settings')}
+                      onClick={() => handleViewChange('settings')}
                       className="flex items-center space-x-2 w-full px-3 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-dark-700 rounded-lg transition-colors text-left"
                     >
                       <Settings className="w-4 h-4" />
@@ -183,7 +195,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                 <button
                   key={item.id}
                   onClick={() => {
-                    setCurrentView(item.id);
+                    handleViewChange(item.id);
                     setMobileMenuOpen(false);
                   }}
                   className={`flex items-center space-x-3 w-full px-4 py-3 rounded-lg transition-all ${

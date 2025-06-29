@@ -21,14 +21,18 @@ export const AuthPage: React.FC = () => {
   const [rateLimitCooldown, setRateLimitCooldown] = useState(0);
 
   const navigate = useNavigate();
-  const { isAuthenticated, isLoading } = useAuth();
+  const { isAuthenticated, isLoading, isAdmin } = useAuth();
 
   // Redirect if already authenticated
   useEffect(() => {
-    if (isAuthenticated && !isLoading) {
-      navigate('/dashboard');
+    if (!isLoading && isAuthenticated) {
+      if (isAdmin && email === 'admin@gmail.com') {
+        navigate('/admin', { replace: true });
+      } else {
+        navigate('/dashboard', { replace: true });
+      }
     }
-  }, [isAuthenticated, isLoading, navigate]);
+  }, [isAuthenticated, isLoading, isAdmin, navigate, email]);
 
   // Countdown timer for rate limit
   useEffect(() => {
@@ -51,8 +55,21 @@ export const AuthPage: React.FC = () => {
   }, [rateLimitCooldown]);
 
   const parseRateLimitError = (errorMessage: string): number => {
-    const match = errorMessage.match(/(\d+) seconds?/);
-    return match ? parseInt(match[1], 10) : 60; // Default to 60 seconds if can't parse
+    // Try multiple patterns to extract wait time
+    const patterns = [
+      /after (\d+) seconds?/,
+      /(\d+) seconds?/,
+      /wait (\d+)/i
+    ];
+    
+    for (const pattern of patterns) {
+      const match = errorMessage.match(pattern);
+      if (match) {
+        return parseInt(match[1], 10);
+      }
+    }
+    
+    return 60; // Default to 60 seconds if can't parse
   };
 
   const validateForm = () => {
@@ -106,19 +123,84 @@ export const AuthPage: React.FC = () => {
     setSuccess('');
 
     try {
+      // Check if Supabase is properly configured
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+      const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+      
+      if (!supabaseUrl || supabaseUrl === 'https://your-project-ref.supabase.co') {
+        throw new Error('Supabase URL is not configured. Please check your .env file and ensure VITE_SUPABASE_URL is set to your actual Supabase project URL.');
+      }
+      
+      if (!supabaseKey || supabaseKey === 'your-anon-key-here') {
+        throw new Error('Supabase anon key is not configured. Please check your .env file and ensure VITE_SUPABASE_ANON_KEY is set to your actual Supabase anon key.');
+      }
+
       switch (mode) {
         case 'signin':
           console.log('Attempting sign in...');
-          const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
+          
+          // Special case for admin login
+          if (email === 'admin@gmail.com' && password === 'admin@23') {
+            const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
+              email,
+              password
+            });
+            
+            if (signInError) {
+              // If admin credentials don't exist yet, create them
+              if (signInError.message.includes('Invalid login credentials')) {
+                // Create admin account
+                const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
+                  email,
+                  password,
+                  options: {
+                    data: {
+                      full_name: 'Admin User',
+                      is_admin: true
+                    }
+                  }
+                });
+                
+                if (signUpError) {
+                  throw signUpError;
+                }
+                
+                // If account was created, sign in
+                const { error: secondSignInError } = await supabase.auth.signInWithPassword({
+                  email,
+                  password
+                });
+                
+                if (secondSignInError) {
+                  throw secondSignInError;
+                }
+              } else {
+                throw signInError;
+              }
+            }
+            
+            showToast.success('Admin login successful!');
+            navigate('/admin');
+            return;
+          }
+          
+          // Regular user login
+          const { data: userData, error: userError } = await supabase.auth.signInWithPassword({
             email,
             password
           });
           
-          if (signInError) {
-            throw signInError;
+          if (userError) {
+            if (userError.message.includes('rate limit') || 
+                userError.message.includes('For security purposes')) {
+              const waitTime = parseRateLimitError(userError.message);
+              setRateLimitCooldown(waitTime);
+              throw new Error(`Rate limit exceeded. Please wait ${waitTime} seconds before trying again.`);
+            }
+            throw userError;
           }
           
-          if (signInData.user) {
+          if (userData.user) {
             showToast.success('Signed in successfully!');
             navigate('/dashboard');
           }
@@ -137,12 +219,19 @@ export const AuthPage: React.FC = () => {
           });
           
           if (signUpError) {
+            if (signUpError.message.includes('rate limit') || 
+                signUpError.message.includes('For security purposes')) {
+              const waitTime = parseRateLimitError(signUpError.message);
+              setRateLimitCooldown(waitTime);
+              throw new Error(`Rate limit exceeded. Please wait ${waitTime} seconds before trying again.`);
+            }
             throw signUpError;
           }
           
           if (signUpData.user) {
             if (!signUpData.session) {
               setSuccess('Account created successfully! Please check your email to verify your account.');
+              setMode('signin');
             } else {
               showToast.success('Signed up successfully!');
               navigate('/dashboard');
@@ -157,6 +246,12 @@ export const AuthPage: React.FC = () => {
           });
           
           if (resetError) {
+            if (resetError.message.includes('rate limit') || 
+                resetError.message.includes('For security purposes')) {
+              const waitTime = parseRateLimitError(resetError.message);
+              setRateLimitCooldown(waitTime);
+              throw new Error(`Rate limit exceeded. Please wait ${waitTime} seconds before trying again.`);
+            }
             throw resetError;
           }
           
@@ -166,11 +261,22 @@ export const AuthPage: React.FC = () => {
     } catch (err: any) {
       console.error('Auth error:', err);
       
+      // Handle configuration errors
+      if (err.message.includes('Supabase') && err.message.includes('configured')) {
+        setError(err.message);
+        return;
+      }
+      
       // Handle rate limit errors specifically
-      if (err.message.includes('wait') && err.message.includes('seconds')) {
+      if (err.message.includes('For security purposes') || 
+          err.message.includes('rate limit') || 
+          (err.message.includes('wait') && err.message.includes('seconds'))) {
+        
         const waitTime = parseRateLimitError(err.message);
         setRateLimitCooldown(waitTime);
-        setError(`Rate limit exceeded. Please wait ${waitTime} seconds before trying again.`);
+        setError(`Please wait ${waitTime} seconds before trying again.`);
+      } else if (err.message === 'Failed to fetch') {
+        setError('Connection failed. Please check your internet connection and Supabase configuration.');
       } else {
         setError(err.message || 'Authentication failed. Please try again.');
       }
@@ -246,6 +352,16 @@ export const AuthPage: React.FC = () => {
                 Forgot password?
               </button>
             </div>
+
+            {/* Rate limit warning for signin */}
+            {rateLimitCooldown > 0 && (
+              <div className="mt-4 p-3 bg-yellow-500/20 border border-yellow-500/30 rounded-lg flex items-center space-x-2">
+                <AlertCircle className="w-4 h-4 text-yellow-400" />
+                <span className="text-yellow-300 text-sm">
+                  Please wait {rateLimitCooldown} seconds before trying again
+                </span>
+              </div>
+            )}
 
             <motion.button
               whileHover={{ scale: 1.02 }}
@@ -480,6 +596,15 @@ export const AuthPage: React.FC = () => {
         );
     }
   };
+
+  // If still loading, show nothing to prevent flash
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900">
+        <div className="w-12 h-12 border-4 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 flex items-center justify-center p-4">

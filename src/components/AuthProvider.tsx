@@ -9,6 +9,7 @@ interface AuthContextType {
   profile: any;
   isLoading: boolean;
   isAuthenticated: boolean;
+  isAdmin: boolean;
   openAuthModal: (mode?: 'signin' | 'signup' | 'forgot-password') => void;
   signOut: () => Promise<void>;
   refreshUser: () => Promise<void>;
@@ -30,6 +31,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [isLoading, setIsLoading] = useState(true);
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [initialAuthMode, setInitialAuthMode] = useState<'signin' | 'signup' | 'forgot-password'>('signin');
+  const [isAdmin, setIsAdmin] = useState(false);
 
   useEffect(() => {
     let mounted = true;
@@ -58,6 +60,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             const profile = await fetchUserProfile(session.user.id);
             if (mounted) {
               setProfile(profile);
+              // Check if user is admin
+              setIsAdmin(profile?.is_admin === true || session.user.email === 'admin@gmail.com');
             }
           } catch (profileError) {
             console.warn('Error loading profile:', profileError);
@@ -90,15 +94,20 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             setUser(session.user);
             const profile = await fetchUserProfile(session.user.id);
             setProfile(profile);
+            // Check if user is admin
+            setIsAdmin(profile?.is_admin === true || session.user.email === 'admin@gmail.com');
           }
         } else if (event === 'SIGNED_OUT') {
           setUser(null);
           setProfile(null);
+          setIsAdmin(false);
         } else if (event === 'USER_UPDATED') {
           if (session?.user) {
             setUser(session.user);
             const profile = await fetchUserProfile(session.user.id);
             setProfile(profile);
+            // Check if user is admin
+            setIsAdmin(profile?.is_admin === true || session.user.email === 'admin@gmail.com');
           }
         }
       } catch (error) {
@@ -121,10 +130,39 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         .from('user_profiles')
         .select('*')
         .eq('id', userId)
-        .single();
+        .maybeSingle();
         
       if (error) {
         console.warn('Error fetching user profile:', error);
+        
+        // If profile doesn't exist, create one
+        if (error.code === 'PGRST116') {
+          try {
+            const { data: userData } = await supabase.auth.getUser();
+            if (userData.user) {
+              const { data: newProfile, error: insertError } = await supabase
+                .from('user_profiles')
+                .insert({
+                  id: userId,
+                  full_name: userData.user.user_metadata?.full_name || userData.user.email?.split('@')[0] || 'User',
+                  total_analyses: 0,
+                  total_problems_solved: 0
+                })
+                .select('*')
+                .single();
+                
+              if (insertError) {
+                console.error('Error creating user profile:', insertError);
+                return null;
+              }
+              
+              return newProfile;
+            }
+          } catch (createError) {
+            console.error('Error creating profile:', createError);
+          }
+        }
+        
         return null;
       }
       
@@ -141,6 +179,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     try {
       const profile = await fetchUserProfile(user.id);
       setProfile(profile);
+      // Check if user is admin
+      setIsAdmin(profile?.is_admin === true || user.email === 'admin@gmail.com');
     } catch (error) {
       console.error('Error refreshing user:', error);
     }
@@ -156,12 +196,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       await AuthService.signOut();
       setUser(null);
       setProfile(null);
+      setIsAdmin(false);
       showToast.success('Signed out successfully');
     } catch (error) {
       console.error('Error signing out:', error);
       // Force clear local state even if signout fails
       setUser(null);
       setProfile(null);
+      setIsAdmin(false);
       showToast.error('Signed out (with errors)');
     }
   };
@@ -180,6 +222,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         profile,
         isLoading,
         isAuthenticated,
+        isAdmin,
         openAuthModal,
         signOut,
         refreshUser

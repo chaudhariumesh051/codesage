@@ -8,7 +8,7 @@ interface ProtectedRouteProps {
 }
 
 export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
-  const { isAuthenticated, isLoading, user } = useAuth();
+  const { isAuthenticated, isLoading, user, isAdmin } = useAuth();
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -22,6 +22,13 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
 
     return () => clearTimeout(timeout);
   }, [isLoading, navigate]);
+
+  // Check if user is admin and redirect to admin panel
+  useEffect(() => {
+    if (isAuthenticated && isAdmin && user?.email === 'admin@gmail.com') {
+      navigate('/admin', { replace: true });
+    }
+  }, [isAuthenticated, isAdmin, user, navigate]);
 
   // Show loading only for a reasonable amount of time
   if (isLoading) {
