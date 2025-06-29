@@ -120,8 +120,21 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   };
 
   const parseRateLimitError = (errorMessage: string): number => {
-    const match = errorMessage.match(/(\d+) seconds?/);
-    return match ? parseInt(match[1], 10) : 60; // Default to 60 seconds if can't parse
+    // Try multiple patterns to extract wait time
+    const patterns = [
+      /after (\d+) seconds?/,
+      /(\d+) seconds?/,
+      /wait (\d+)/i
+    ];
+    
+    for (const pattern of patterns) {
+      const match = errorMessage.match(pattern);
+      if (match) {
+        return parseInt(match[1], 10);
+      }
+    }
+    
+    return 60; // Default to 60 seconds if can't parse
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -192,22 +205,28 @@ export const AuthModal: React.FC<AuthModalProps> = ({
       }
       
       // Handle rate limit errors specifically
-      if (error.message.includes('wait') && error.message.includes('seconds')) {
+      if (error.message.includes('For security purposes') || 
+          error.message.includes('rate limit') || 
+          error.message.includes('wait') && error.message.includes('seconds')) {
+        
         const waitTime = parseRateLimitError(error.message);
         setRateLimitCooldown(waitTime);
         showToast.error(`Rate limit exceeded. Please wait ${waitTime} seconds before trying again.`);
+        setErrors(prev => ({ ...prev, general: `Please wait ${waitTime} seconds before trying again.` }));
       } else if (error.message === 'Failed to fetch') {
         showToast.error('Unable to connect to the server. Please check your internet connection and ensure Supabase is properly configured.');
         setErrors(prev => ({ ...prev, general: 'Connection failed. Please check your Supabase configuration.' }));
       } else {
         showToast.error(error.message || 'Authentication failed. Please try again.');
-      }
-      
-      // Set specific error messages
-      if (error.message.includes('password')) {
-        setErrors(prev => ({ ...prev, password: error.message }));
-      } else if (error.message.includes('email')) {
-        setErrors(prev => ({ ...prev, email: error.message }));
+        
+        // Set specific error messages
+        if (error.message.includes('password')) {
+          setErrors(prev => ({ ...prev, password: error.message }));
+        } else if (error.message.includes('email')) {
+          setErrors(prev => ({ ...prev, email: error.message }));
+        } else {
+          setErrors(prev => ({ ...prev, general: error.message }));
+        }
       }
     } finally {
       setIsLoading(false);
@@ -310,6 +329,16 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                 Forgot password?
               </button>
             </div>
+
+            {/* Rate limit warning for signin */}
+            {rateLimitCooldown > 0 && (
+              <div className="mt-4 p-3 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg flex items-center space-x-2">
+                <AlertCircle className="w-4 h-4 text-yellow-600 dark:text-yellow-400" />
+                <span className="text-yellow-700 dark:text-yellow-300 text-sm">
+                  Please wait {rateLimitCooldown} seconds before trying again
+                </span>
+              </div>
+            )}
 
             <motion.button
               whileHover={{ scale: 1.02 }}

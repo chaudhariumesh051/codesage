@@ -25,22 +25,45 @@ export class AuthService {
    * Parse rate limit error and return wait time in seconds
    */
   private static parseRateLimitError(errorMessage: string): number | null {
-    const match = errorMessage.match(/after (\d+) seconds?/);
-    return match ? parseInt(match[1], 10) : null;
+    // Try multiple patterns to extract wait time
+    const patterns = [
+      /after (\d+) seconds?/,
+      /(\d+) seconds?/,
+      /wait (\d+)/i
+    ];
+    
+    for (const pattern of patterns) {
+      const match = errorMessage.match(pattern);
+      if (match) {
+        return parseInt(match[1], 10);
+      }
+    }
+    
+    return null;
   }
 
   /**
    * Handle rate limit errors with user-friendly messages
    */
   private static handleRateLimitError(error: any): never {
-    if (error.message?.includes('over_email_send_rate_limit')) {
+    if (error.message?.includes('over_email_send_rate_limit') || 
+        error.message?.includes('For security purposes') ||
+        error.code === 'over_email_send_rate_limit') {
+      
       const waitTime = this.parseRateLimitError(error.message);
       if (waitTime) {
-        throw new Error(`Too many email requests. Please wait ${waitTime} seconds before trying again.`);
+        throw new Error(`For security purposes, you can only request this after ${waitTime} seconds.`);
       } else {
-        throw new Error('Too many email requests. Please wait a moment before trying again.');
+        throw new Error('Too many requests. Please wait a moment before trying again.');
       }
     }
+    
+    // Handle other rate limit related errors
+    if (error.status === 429 || error.message?.includes('rate limit')) {
+      const waitTime = this.parseRateLimitError(error.message) || 60;
+      throw new Error(`Rate limit exceeded. Please wait ${waitTime} seconds before trying again.`);
+    }
+    
     throw error;
   }
 
@@ -93,7 +116,7 @@ export class AuthService {
 
       if (error) {
         console.error('Sign in error:', error);
-        throw error
+        this.handleRateLimitError(error);
       }
 
       console.log('Sign in successful:', authData.user?.id);
