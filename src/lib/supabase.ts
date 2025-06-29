@@ -56,12 +56,38 @@ const clearCorruptedAuthData = () => {
 // Clear corrupted data before creating client
 clearCorruptedAuthData();
 
+// Use a custom storage key to avoid conflicts
+const storageKey = 'codesage-auth-token';
+
 export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   auth: {
     autoRefreshToken: true,
     persistSession: true,
     detectSessionInUrl: true,
-    flowType: 'pkce'
+    flowType: 'pkce',
+    storage: {
+      getItem: (key) => {
+        const storedItem = localStorage.getItem(storageKey);
+        if (key === 'sb-auth-token') {
+          return storedItem;
+        }
+        return localStorage.getItem(key);
+      },
+      setItem: (key, value) => {
+        if (key === 'sb-auth-token') {
+          localStorage.setItem(storageKey, value);
+        } else {
+          localStorage.setItem(key, value);
+        }
+      },
+      removeItem: (key) => {
+        if (key === 'sb-auth-token') {
+          localStorage.removeItem(storageKey);
+        } else {
+          localStorage.removeItem(key);
+        }
+      }
+    }
   },
   global: {
     headers: {

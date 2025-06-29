@@ -2,17 +2,18 @@ import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../components/AuthProvider';
-import { Brain, Mail, Lock, User, Eye, EyeOff, ArrowRight, Sparkles, AlertCircle, CheckCircle, Loader } from 'lucide-react';
+import { Brain, Mail, Lock, User, Eye, EyeOff, ArrowRight, AlertCircle, CheckCircle, Loader } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { showToast } from '../components/Toast';
 
-type AuthMode = 'signin' | 'signup' | 'magic-link';
+type AuthMode = 'signin' | 'signup' | 'forgot-password';
 
 export const AuthPage: React.FC = () => {
   const [mode, setMode] = useState<AuthMode>('signin');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [fullName, setFullName] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -54,8 +55,52 @@ export const AuthPage: React.FC = () => {
     return match ? parseInt(match[1], 10) : 60; // Default to 60 seconds if can't parse
   };
 
+  const validateForm = () => {
+    setError('');
+    
+    if (!email) {
+      setError('Email is required');
+      return false;
+    }
+    
+    if (!/\S+@\S+\.\S+/.test(email)) {
+      setError('Please enter a valid email address');
+      return false;
+    }
+    
+    if (mode !== 'forgot-password') {
+      if (!password) {
+        setError('Password is required');
+        return false;
+      }
+      
+      if (mode === 'signup') {
+        if (password.length < 6) {
+          setError('Password must be at least 6 characters');
+          return false;
+        }
+        
+        if (!fullName) {
+          setError('Full name is required');
+          return false;
+        }
+        
+        if (password !== confirmPassword) {
+          setError('Passwords do not match');
+          return false;
+        }
+      }
+    }
+    
+    return true;
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    if (!validateForm()) return;
+    if (rateLimitCooldown > 0) return;
+
     setLoading(true);
     setError('');
     setSuccess('');
@@ -103,19 +148,16 @@ export const AuthPage: React.FC = () => {
           }
           break;
           
-        case 'magic-link':
-          const { error: magicLinkError } = await supabase.auth.signInWithOtp({
-            email,
-            options: {
-              emailRedirectTo: `${window.location.origin}/dashboard`
-            }
+        case 'forgot-password':
+          const { error: resetError } = await supabase.auth.resetPasswordForEmail(email, {
+            redirectTo: `${window.location.origin}/auth/reset-password`
           });
           
-          if (magicLinkError) {
-            throw magicLinkError;
+          if (resetError) {
+            throw resetError;
           }
           
-          setSuccess('Magic link sent! Please check your email.');
+          setSuccess('Password reset email sent! Please check your inbox.');
           break;
       }
     } catch (err: any) {
@@ -190,6 +232,16 @@ export const AuthPage: React.FC = () => {
                   </button>
                 </div>
               </div>
+            </div>
+
+            <div className="flex justify-end mt-2">
+              <button
+                type="button"
+                onClick={() => setMode('forgot-password')}
+                className="text-sm font-medium text-blue-400 hover:text-blue-300"
+              >
+                Forgot password?
+              </button>
             </div>
 
             <motion.button
@@ -291,6 +343,26 @@ export const AuthPage: React.FC = () => {
                 </div>
                 <p className="mt-1 text-xs text-gray-400">Minimum 6 characters</p>
               </div>
+
+              <div>
+                <label htmlFor="confirmPassword" className="block text-sm font-medium text-white mb-1">
+                  Confirm Password
+                </label>
+                <div className="relative">
+                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                    <Lock className="h-5 w-5 text-gray-400" />
+                  </div>
+                  <input
+                    id="confirmPassword"
+                    type={showPassword ? "text" : "password"}
+                    value={confirmPassword}
+                    onChange={(e) => setConfirmPassword(e.target.value)}
+                    className="pl-10 pr-10 w-full px-4 py-3 bg-white/10 border border-white/20 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all text-white"
+                    placeholder="••••••••"
+                    required
+                  />
+                </div>
+              </div>
             </div>
 
             {/* Rate limit warning for signup */}
@@ -326,9 +398,19 @@ export const AuthPage: React.FC = () => {
           </>
         );
 
-      case 'magic-link':
+      case 'forgot-password':
         return (
           <>
+            <div className="text-center mb-6">
+              <div className="mx-auto w-12 h-12 bg-blue-500/30 rounded-full flex items-center justify-center">
+                <Lock className="h-6 w-6 text-blue-400" />
+              </div>
+              <h3 className="mt-3 text-lg font-medium text-white">Reset your password</h3>
+              <p className="mt-1 text-sm text-gray-300">
+                Enter your email and we'll send you a link to reset your password
+              </p>
+            </div>
+
             <div className="space-y-4">
               <div>
                 <label htmlFor="email" className="block text-sm font-medium text-white mb-1">
@@ -351,7 +433,7 @@ export const AuthPage: React.FC = () => {
               </div>
             </div>
 
-            {/* Rate limit warning for magic link */}
+            {/* Rate limit warning for password reset */}
             {rateLimitCooldown > 0 && (
               <div className="mt-4 p-3 bg-yellow-500/20 border border-yellow-500/30 rounded-lg flex items-center space-x-2">
                 <AlertCircle className="w-4 h-4 text-yellow-400" />
@@ -366,7 +448,7 @@ export const AuthPage: React.FC = () => {
               whileTap={{ scale: 0.98 }}
               type="submit"
               disabled={loading || rateLimitCooldown > 0}
-              className="w-full flex justify-center items-center px-4 py-3 bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-xl font-semibold hover:from-purple-700 hover:to-pink-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500 disabled:opacity-50 transition-all shadow-lg hover:shadow-xl mt-6"
+              className="w-full flex justify-center items-center px-4 py-3 bg-blue-600 text-white rounded-xl font-semibold hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 transition-all mt-6"
             >
               {loading ? (
                 <Loader className="w-5 h-5 animate-spin mr-2" />
@@ -376,8 +458,8 @@ export const AuthPage: React.FC = () => {
                 </>
               ) : (
                 <>
-                  <Sparkles className="w-5 h-5 mr-2" />
-                  <span>Send Magic Link</span>
+                  <ArrowRight className="w-5 h-5 mr-2" />
+                  <span>Send Reset Link</span>
                 </>
               )}
             </motion.button>
@@ -403,12 +485,12 @@ export const AuthPage: React.FC = () => {
             </div>
             <h1 className="text-2xl font-bold text-white mb-2">
               {mode === 'signin' ? 'Welcome Back' : 
-               mode === 'signup' ? 'Create Account' : 'Magic Link'}
+               mode === 'signup' ? 'Create Account' : 'Reset Password'}
             </h1>
             <p className="text-blue-300">
               {mode === 'signin' ? 'Sign in to your CodeSage account' :
                mode === 'signup' ? 'Join CodeSage and start learning' :
-               'We\'ll send you a magic link to sign in'}
+               'We\'ll send you a reset link to your email'}
             </p>
           </div>
 
@@ -476,17 +558,6 @@ export const AuthPage: React.FC = () => {
                 }`}
               >
                 Sign Up
-              </button>
-              <button
-                type="button"
-                onClick={() => setMode('magic-link')}
-                className={`flex-1 py-2 px-4 rounded-lg text-sm font-medium transition-all ${
-                  mode === 'magic-link'
-                    ? 'bg-purple-600 text-white'
-                    : 'bg-white/10 text-gray-300 hover:bg-white/20'
-                }`}
-              >
-                Magic Link
               </button>
             </div>
           </div>

@@ -48,16 +48,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       } else if (event === 'SIGNED_OUT') {
         setUser(null);
         setProfile(null);
-      } else if (event === 'TOKEN_REFRESHED' && !session) {
-        // Handle failed token refresh
-        console.warn('Token refresh failed, signing out user');
-        setUser(null);
-        setProfile(null);
-        // Clear any corrupted auth data
-        try {
-          await supabase.auth.signOut();
-        } catch (error) {
-          console.warn('Error during cleanup signout:', error);
+      } else if (event === 'USER_UPDATED') {
+        if (session?.user) {
+          setUser(session.user);
+          const profile = await fetchUserProfile(session.user.id);
+          setProfile(profile);
         }
       }
     });
