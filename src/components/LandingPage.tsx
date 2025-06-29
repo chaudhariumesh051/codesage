@@ -31,12 +31,19 @@ export const LandingPage: React.FC = () => {
   const opacity = useTransform(scrollY, [0, 300], [1, 0.5]);
 
   const handleGetStarted = () => {
-    if (isLoading) return;
-
+    // Don't check loading state here - just handle the action
     if (isAuthenticated) {
       navigate("/dashboard");
     } else {
       openAuthModal("signup");
+    }
+  };
+
+  const handleSignIn = () => {
+    if (isAuthenticated) {
+      navigate("/dashboard");
+    } else {
+      openAuthModal("signin");
     }
   };
 
@@ -189,16 +196,10 @@ export const LandingPage: React.FC = () => {
           <motion.button
             whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.95 }}
-            onClick={() =>
-              isAuthenticated ? navigate("/dashboard") : openAuthModal("signin")
-            }
-            disabled={isLoading}
-            className="px-6 py-2 bg-gradient-to-r from-blue-600 to-purple-600 rounded-lg font-medium hover:from-blue-700 hover:to-purple-700 transition-all shadow-lg hover:shadow-xl disabled:opacity-50">
-            {isLoading
-              ? "Loading..."
-              : isAuthenticated
-              ? "Dashboard"
-              : "Sign In"}
+            onClick={handleSignIn}
+            className="px-6 py-2 bg-gradient-to-r from-blue-600 to-purple-600 rounded-lg font-medium hover:from-blue-700 hover:to-purple-700 transition-all shadow-lg hover:shadow-xl"
+          >
+            {isAuthenticated ? "Dashboard" : "Sign In"}
           </motion.button>
         </div>
       </motion.nav>
@@ -249,22 +250,19 @@ export const LandingPage: React.FC = () => {
               }}
               whileTap={{ scale: 0.95 }}
               onClick={handleGetStarted}
-              disabled={isLoading}
-              className="px-8 py-4 bg-gradient-to-r from-blue-600 to-purple-600 rounded-xl font-semibold text-lg flex items-center space-x-2 hover:from-blue-700 hover:to-purple-700 transition-all shadow-lg hover:shadow-2xl disabled:opacity-50">
+              className="px-8 py-4 bg-gradient-to-r from-blue-600 to-purple-600 rounded-xl font-semibold text-lg flex items-center space-x-2 hover:from-blue-700 hover:to-purple-700 transition-all shadow-lg hover:shadow-2xl"
+            >
               <Play className="w-5 h-5" />
               <span>
-                {isLoading
-                  ? "Loading..."
-                  : isAuthenticated
-                  ? "Go to Dashboard"
-                  : "Start Learning Free"}
+                {isAuthenticated ? "Go to Dashboard" : "Start Learning Free"}
               </span>
             </motion.button>
 
             <motion.button
               whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.95 }}
-              className="px-8 py-4 border border-gray-600 rounded-xl font-semibold text-lg flex items-center space-x-2 hover:border-gray-500 hover:bg-gray-800/50 transition-all backdrop-blur-sm">
+              className="px-8 py-4 border border-gray-600 rounded-xl font-semibold text-lg flex items-center space-x-2 hover:border-gray-500 hover:bg-gray-800/50 transition-all backdrop-blur-sm"
+            >
               <Video className="w-5 h-5" />
               <span>Watch Demo</span>
               <ArrowRight className="w-5 h-5" />
@@ -438,15 +436,11 @@ export const LandingPage: React.FC = () => {
               }}
               whileTap={{ scale: 0.95 }}
               onClick={handleGetStarted}
-              disabled={isLoading}
-              className="px-12 py-6 bg-gradient-to-r from-blue-600 to-purple-600 rounded-2xl font-bold text-xl flex items-center space-x-3 mx-auto hover:from-blue-700 hover:to-purple-700 transition-all shadow-lg hover:shadow-2xl disabled:opacity-50">
+              className="px-12 py-6 bg-gradient-to-r from-blue-600 to-purple-600 rounded-2xl font-bold text-xl flex items-center space-x-3 mx-auto hover:from-blue-700 hover:to-purple-700 transition-all shadow-lg hover:shadow-2xl"
+            >
               <Sparkles className="w-6 h-6" />
               <span>
-                {isLoading
-                  ? "Loading..."
-                  : isAuthenticated
-                  ? "Go to Dashboard"
-                  : "Start Your Free Journey"}
+                {isAuthenticated ? "Go to Dashboard" : "Start Your Free Journey"}
               </span>
               <ArrowRight className="w-6 h-6" />
             </motion.button>
