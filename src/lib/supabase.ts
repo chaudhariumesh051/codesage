@@ -115,6 +115,8 @@ export interface UserProfile {
   subscription_status: 'free' | 'pro' | 'enterprise' | 'cancelled'
   subscription_plan?: string
   subscription_expires_at?: string
+  trial_ends_at?: string
+  billing_customer_id?: string
   daily_code_analysis_count: number
   daily_problem_solving_count: number
   daily_video_generation_count: number
