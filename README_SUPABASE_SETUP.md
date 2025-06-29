@@ -1,5 +1,9 @@
 # CodeOrbit Supabase Setup Instructions
 
+## 🚨 IMPORTANT: Connection Issues?
+
+If you're seeing "Failed to fetch" errors, your Supabase credentials are likely incorrect or your project may be paused. Follow these steps carefully:
+
 ## Getting Your Supabase Credentials
 
 To connect CodeOrbit to your Supabase database, you need to get your actual Supabase project credentials:
@@ -9,7 +13,12 @@ To connect CodeOrbit to your Supabase database, you need to get your actual Supa
 2. Sign in to your account
 3. Select your project (or create a new one if you don't have one)
 
-### Step 2: Get Your API Keys
+### Step 2: Check Project Status
+1. Make sure your project is **ACTIVE** and not paused
+2. If your project is paused, click "Resume" to reactivate it
+3. Free tier projects pause after 1 week of inactivity
+
+### Step 3: Get Your API Keys
 1. In your project dashboard, click on the **Settings** icon in the left sidebar
 2. Click on **API** in the settings menu
 3. You'll see your project credentials:
@@ -18,7 +27,7 @@ To connect CodeOrbit to your Supabase database, you need to get your actual Supa
      - **anon public**: This is your `VITE_SUPABASE_ANON_KEY`
      - **service_role secret**: This is your `SUPABASE_SERVICE_ROLE_KEY`
 
-### Step 3: Update Your Environment Variables
+### Step 4: Update Your Environment Variables
 1. Open your `.env` file in the project root
 2. Replace the placeholder values with your actual credentials:
 
@@ -26,23 +35,21 @@ To connect CodeOrbit to your Supabase database, you need to get your actual Supa
 VITE_SUPABASE_URL=https://your-project-ref.supabase.co
 VITE_SUPABASE_ANON_KEY=your-actual-anon-key-here
 SUPABASE_SERVICE_ROLE_KEY=your-actual-service-role-key-here
+
+# AI Services
+VITE_GEMINI_API_KEY=your-gemini-api-key-here
 ```
 
-### Step 4: Run Database Migrations
-The database schema will be automatically created when you first run the application. The migration includes:
+### Step 5: Verify Your Credentials
+1. Make sure your `VITE_SUPABASE_URL` follows this format: `https://[project-ref].supabase.co`
+2. Make sure your `VITE_SUPABASE_ANON_KEY` is a long JWT token starting with `eyJ`
+3. Double-check there are no extra spaces or characters
 
-- **User Management**: Profiles, sessions, security logs, preferences
-- **Code Analysis**: Submissions, analyses, solutions, execution results
-- **AI Features**: Chat history, usage tracking, AI models
-- **Learning System**: Challenges, progress tracking, achievements
-- **Subscription System**: Plans, billing, usage limits
-- **Content Management**: Videos, file uploads, exports
-- **Security**: Audit logs, rate limiting, feature flags
-
-### Step 5: Restart Your Development Server
+### Step 6: Restart Your Development Server
 After updating the `.env` file:
 1. Stop your development server (Ctrl+C)
 2. Start it again with `npm run dev`
+3. Check the browser console for any connection test messages
 
 ## Database Schema Overview
 
@@ -100,6 +107,25 @@ The database includes comprehensive security features:
 - **Audit logging** - Tracks all important actions
 - **Session management** - Secure multi-device login tracking
 
+## Common Issues & Solutions
+
+### "Failed to fetch" Error
+- **Cause**: Incorrect Supabase URL or API key
+- **Solution**: Double-check your credentials in the Supabase dashboard
+- **Check**: Make sure your project is not paused
+
+### "Invalid API key" Error
+- **Cause**: Wrong API key or expired key
+- **Solution**: Copy the anon key again from your Supabase dashboard
+
+### "Network Error" or "CORS Error"
+- **Cause**: Project is paused or URL is incorrect
+- **Solution**: Resume your project and verify the URL format
+
+### Connection Timeout
+- **Cause**: Network issues or server problems
+- **Solution**: Check your internet connection and try again
+
 ## Security Notes
 
 - **Never commit your `.env` file to version control**
@@ -107,15 +133,16 @@ The database includes comprehensive security features:
 - The `service_role` key should only be used server-side (in edge functions)
 - Keep your `service_role` key secret as it has admin privileges
 
-## Troubleshooting
+## Troubleshooting Steps
 
 If you're still getting authentication errors:
 
-1. **Double-check your credentials**: Make sure you copied the keys correctly
-2. **Check for extra spaces**: Ensure there are no leading/trailing spaces in your keys
-3. **Verify project status**: Make sure your Supabase project is active and not paused
-4. **Clear browser cache**: Sometimes cached credentials can cause issues
-5. **Check database migrations**: Ensure all tables were created successfully
+1. **Verify project status**: Ensure your Supabase project is active
+2. **Double-check credentials**: Copy-paste keys directly from dashboard
+3. **Check for typos**: Ensure no extra spaces or missing characters
+4. **Clear browser cache**: Sometimes cached credentials cause issues
+5. **Test connection**: Check browser console for connection test results
+6. **Restart dev server**: Stop and start your development server
 
 ## Features Enabled
 
@@ -137,3 +164,11 @@ With this database setup, CodeOrbit supports:
 2. Configure Tavus API for video generation (optional)
 3. Set up Stripe for subscription billing (optional)
 4. Customize the application branding and content
+
+## Need Help?
+
+If you're still experiencing issues:
+1. Check the browser console for detailed error messages
+2. Verify your project is active in the Supabase dashboard
+3. Try creating a new Supabase project if the current one has issues
+4. Make sure you're using the correct project credentials

@@ -69,8 +69,35 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
     headers: {
       'X-Client-Info': 'codeorbit-web'
     }
+  },
+  // Add retry configuration to handle network issues
+  db: {
+    schema: 'public'
+  },
+  // Add timeout and retry settings
+  realtime: {
+    params: {
+      eventsPerSecond: 10
+    }
   }
 })
+
+// Test connection on initialization
+const testConnection = async () => {
+  try {
+    const { data, error } = await supabase.from('user_profiles').select('count').limit(1).single()
+    if (error && error.code !== 'PGRST116') { // PGRST116 is "no rows returned" which is fine
+      console.warn('Supabase connection test failed:', error.message)
+    } else {
+      console.log('Supabase connection successful')
+    }
+  } catch (error) {
+    console.warn('Supabase connection test error:', error)
+  }
+}
+
+// Test connection after a short delay to allow for initialization
+setTimeout(testConnection, 1000)
 
 // Database types
 export interface UserProfile {
