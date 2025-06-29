@@ -134,6 +134,18 @@ export const AuthModal: React.FC<AuthModalProps> = ({
     setErrors({});
 
     try {
+      // Check if Supabase is properly configured
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+      const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+      
+      if (!supabaseUrl || supabaseUrl === 'https://your-project-ref.supabase.co') {
+        throw new Error('Supabase URL is not configured. Please check your .env file and ensure VITE_SUPABASE_URL is set to your actual Supabase project URL.');
+      }
+      
+      if (!supabaseKey || supabaseKey === 'your-anon-key-here') {
+        throw new Error('Supabase anon key is not configured. Please check your .env file and ensure VITE_SUPABASE_ANON_KEY is set to your actual Supabase anon key.');
+      }
+
       switch (mode) {
         case 'signin':
           console.log('Attempting sign in...');
@@ -172,11 +184,21 @@ export const AuthModal: React.FC<AuthModalProps> = ({
     } catch (error: any) {
       console.error('Auth error:', error);
       
+      // Handle configuration errors
+      if (error.message.includes('Supabase') && error.message.includes('configured')) {
+        showToast.error(error.message);
+        setErrors(prev => ({ ...prev, general: error.message }));
+        return;
+      }
+      
       // Handle rate limit errors specifically
       if (error.message.includes('wait') && error.message.includes('seconds')) {
         const waitTime = parseRateLimitError(error.message);
         setRateLimitCooldown(waitTime);
         showToast.error(`Rate limit exceeded. Please wait ${waitTime} seconds before trying again.`);
+      } else if (error.message === 'Failed to fetch') {
+        showToast.error('Unable to connect to the server. Please check your internet connection and ensure Supabase is properly configured.');
+        setErrors(prev => ({ ...prev, general: 'Connection failed. Please check your Supabase configuration.' }));
       } else {
         showToast.error(error.message || 'Authentication failed. Please try again.');
       }
@@ -197,6 +219,12 @@ export const AuthModal: React.FC<AuthModalProps> = ({
       case 'signin':
         return (
           <>
+            {errors.general && (
+              <div className="mb-4 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
+                <p className="text-red-700 dark:text-red-300 text-sm">{errors.general}</p>
+              </div>
+            )}
+            
             <div className="space-y-4">
               <div>
                 <label htmlFor="email" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
@@ -322,6 +350,12 @@ export const AuthModal: React.FC<AuthModalProps> = ({
       case 'signup':
         return (
           <>
+            {errors.general && (
+              <div className="mb-4 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
+                <p className="text-red-700 dark:text-red-300 text-sm">{errors.general}</p>
+              </div>
+            )}
+            
             <div className="space-y-4">
               <div>
                 <label htmlFor="fullName" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
@@ -488,6 +522,12 @@ export const AuthModal: React.FC<AuthModalProps> = ({
       case 'forgot-password':
         return (
           <>
+            {errors.general && (
+              <div className="mb-4 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
+                <p className="text-red-700 dark:text-red-300 text-sm">{errors.general}</p>
+              </div>
+            )}
+            
             <div className="text-center mb-6">
               <div className="mx-auto w-12 h-12 bg-blue-100 dark:bg-blue-900/30 rounded-full flex items-center justify-center">
                 <Lock className="h-6 w-6 text-blue-600 dark:text-blue-400" />

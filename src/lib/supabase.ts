@@ -4,31 +4,34 @@ const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY
 
 // Check if environment variables are properly configured
-if (!supabaseUrl || supabaseUrl === 'your_supabase_project_url_here') {
-  throw new Error(
+if (!supabaseUrl || supabaseUrl === 'https://your-project-ref.supabase.co') {
+  console.error(
     'VITE_SUPABASE_URL is not configured. Please update your .env file with your actual Supabase project URL. ' +
     'You can find this in your Supabase dashboard under Project Settings > API. ' +
     'See README_SUPABASE_SETUP.md for detailed instructions.'
   )
+  throw new Error('Supabase URL not configured')
 }
 
-if (!supabaseAnonKey || supabaseAnonKey === 'your_supabase_anon_key_here') {
-  throw new Error(
+if (!supabaseAnonKey || supabaseAnonKey === 'your-anon-key-here') {
+  console.error(
     'VITE_SUPABASE_ANON_KEY is not configured. Please update your .env file with your actual Supabase anon key. ' +
     'You can find this in your Supabase dashboard under Project Settings > API. ' +
     'See README_SUPABASE_SETUP.md for detailed instructions.'
   )
+  throw new Error('Supabase anon key not configured')
 }
 
 // Validate URL format
 try {
   new URL(supabaseUrl)
 } catch (error) {
-  throw new Error(
+  console.error(
     `VITE_SUPABASE_URL is not a valid URL: "${supabaseUrl}". ` +
     'Please ensure it follows the format: https://your-project-ref.supabase.co. ' +
     'See README_SUPABASE_SETUP.md for detailed instructions.'
   )
+  throw new Error('Invalid Supabase URL format')
 }
 
 export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
