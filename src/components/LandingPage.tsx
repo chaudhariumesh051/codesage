@@ -218,7 +218,7 @@ export const LandingPage: React.FC = () => {
               <div className="flex items-center space-x-2 bg-gradient-to-r from-blue-500/20 to-purple-500/20 backdrop-blur-sm border border-blue-500/30 rounded-full px-4 py-2">
                 <Crown className="w-4 h-4 text-yellow-400" />
                 <span className="text-sm font-medium text-blue-300">
-                  Powered by Gemini 2.0 Flash & Tavus AI
+                  Powered by Gemini 2.0 Flash
                 </span>
               </div>
             </motion.div>
@@ -231,7 +231,7 @@ export const LandingPage: React.FC = () => {
               <span className="text-white">Like Never Before</span>
             </h1>
             <p className="text-xl text-gray-300 max-w-3xl mx-auto leading-relaxed">
-              AI-powered code analysis with personalized video explanations,
+              AI-powered code analysis with personalized explanations,
               interactive flowcharts, and intelligent challenges. Transform how
               you learn, debug, and master programming.
             </p>
@@ -412,7 +412,7 @@ export const LandingPage: React.FC = () => {
       </section>
 
       {/* CTA Section */}
-      <section className="relative z-10 py-32">
+      <section id="about" className="relative z-10 py-32">
         <div className="max-w-4xl mx-auto px-6 text-center">
           <motion.div
             initial={{ opacity: 0, y: 30 }}
@@ -457,28 +457,6 @@ export const LandingPage: React.FC = () => {
           </motion.div>
         </div>
       </section>
-
-      {/* Built on Bolt Badge - Top Right (Large) */}
-      <motion.div
-        initial={{ opacity: 0, x: 20 }}
-        animate={{ opacity: 1, x: 0 }}
-        transition={{ delay: 0.5 }}
-        className="fixed top-4 right-4 z-50">
-        <motion.a
-          href="https://bolt.new"
-          target="_blank"
-          rel="noopener noreferrer"
-          whileHover={{ scale: 1.05 }}
-          whileTap={{ scale: 0.95 }}
-          title="Built on Bolt"
-          className="block w-16 h-16">
-          <img
-            src="https://raw.githubusercontent.com/kickiniteasy/bolt-hackathon-badge/main/src/public/bolt-badge/white_circle_360x360/white_circle_360x360.png"
-            alt="Built on Bolt"
-            className="w-full h-full object-contain rounded-full shadow-md hover:shadow-xl transition"
-          />
-        </motion.a>
-      </motion.div>
 
       {/* Footer */}
       <footer className="relative z-10 border-t border-gray-800 py-12">
