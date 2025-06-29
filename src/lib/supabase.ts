@@ -31,13 +31,52 @@ try {
   )
 }
 
+// Clear corrupted auth data on initialization
+const clearCorruptedAuthData = () => {
+  try {
+    const keys = Object.keys(localStorage);
+    const supabaseKeys = keys.filter(key => key.startsWith('sb-') && key.includes('-auth-token'));
+    
+    supabaseKeys.forEach(key => {
+      try {
+        const data = localStorage.getItem(key);
+        if (data) {
+          JSON.parse(data);
+        }
+      } catch (e) {
+        console.warn(`Clearing corrupted auth data for key: ${key}`);
+        localStorage.removeItem(key);
+      }
+    });
+  } catch (error) {
+    console.warn('Error checking auth data:', error);
+  }
+};
+
+// Clear corrupted data before creating client
+clearCorruptedAuthData();
+
 export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   auth: {
     autoRefreshToken: true,
     persistSession: true,
-    detectSessionInUrl: true
+    detectSessionInUrl: true,
+    flowType: 'pkce'
+  },
+  global: {
+    headers: {
+      'X-Client-Info': 'supabase-js-web'
+    }
   }
 })
+
+// Handle auth errors globally
+supabase.auth.onAuthStateChange((event, session) => {
+  if (event === 'TOKEN_REFRESHED' && !session) {
+    console.warn('Token refresh failed, clearing auth data');
+    clearCorruptedAuthData();
+  }
+});
 
 // Database types
 export interface Profile {

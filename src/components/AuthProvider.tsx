@@ -48,6 +48,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       } else if (event === 'SIGNED_OUT') {
         setUser(null);
         setProfile(null);
+      } else if (event === 'TOKEN_REFRESHED' && !session) {
+        // Handle failed token refresh
+        console.warn('Token refresh failed, signing out user');
+        setUser(null);
+        setProfile(null);
+        // Clear any corrupted auth data
+        try {
+          await supabase.auth.signOut();
+        } catch (error) {
+          console.warn('Error during cleanup signout:', error);
+        }
       }
     });
 
@@ -59,15 +70,46 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const checkUser = async () => {
     try {
       setIsLoading(true);
-      const { data: { user } } = await supabase.auth.getUser();
       
-      if (user) {
-        setUser(user);
-        const profile = await fetchUserProfile(user.id);
+      // First try to get the current session
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+      
+      if (sessionError) {
+        console.warn('Session error:', sessionError);
+        // Clear any corrupted session data
+        await supabase.auth.signOut();
+        return;
+      }
+      
+      if (session?.user) {
+        setUser(session.user);
+        const profile = await fetchUserProfile(session.user.id);
         setProfile(profile);
+      } else {
+        // Try to get user if session is null but there might be a valid token
+        const { data: { user }, error: userError } = await supabase.auth.getUser();
+        
+        if (userError) {
+          console.warn('User error:', userError);
+          // Clear any corrupted auth data
+          await supabase.auth.signOut();
+          return;
+        }
+        
+        if (user) {
+          setUser(user);
+          const profile = await fetchUserProfile(user.id);
+          setProfile(profile);
+        }
       }
     } catch (error) {
       console.error('Error checking user:', error);
+      // Clear any corrupted auth data on error
+      try {
+        await supabase.auth.signOut();
+      } catch (signOutError) {
+        console.warn('Error during cleanup signout:', signOutError);
+      }
     } finally {
       setIsLoading(false);
     }
@@ -82,7 +124,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         .single();
         
       if (error) {
-        throw error;
+        console.warn('Error fetching user profile:', error);
+        return null;
       }
       
       return data;
@@ -116,7 +159,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       showToast.success('Signed out successfully');
     } catch (error) {
       console.error('Error signing out:', error);
-      showToast.error('Failed to sign out');
+      // Force clear local state even if signout fails
+      setUser(null);
+      setProfile(null);
+      showToast.error('Signed out (with errors)');
     }
   };
 
@@ -143,6 +189,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         isOpen={showAuthModal}
         onClose={() => setShowAuthModal(false)}
         onSuccess={handleAuthSuccess}
+        initialMode={initialAuthMode}
       />
     </AuthContext.Provider>
   );
