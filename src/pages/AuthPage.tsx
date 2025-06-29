@@ -108,6 +108,7 @@ export const AuthPage: React.FC = () => {
     try {
       switch (mode) {
         case 'signin':
+          console.log('Attempting sign in...');
           const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
             email,
             password
@@ -124,6 +125,7 @@ export const AuthPage: React.FC = () => {
           break;
           
         case 'signup':
+          console.log('Attempting sign up...');
           const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
             email,
             password,
@@ -149,6 +151,7 @@ export const AuthPage: React.FC = () => {
           break;
           
         case 'forgot-password':
+          console.log('Attempting password reset...');
           const { error: resetError } = await supabase.auth.resetPasswordForEmail(email, {
             redirectTo: `${window.location.origin}/auth/reset-password`
           });
@@ -463,6 +466,16 @@ export const AuthPage: React.FC = () => {
                 </>
               )}
             </motion.button>
+
+            <div className="mt-6 text-center">
+              <button
+                type="button"
+                onClick={() => setMode('signin')}
+                className="text-sm font-medium text-blue-400 hover:text-blue-300"
+              >
+                Back to sign in
+              </button>
+            </div>
           </>
         );
     }

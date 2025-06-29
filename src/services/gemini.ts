@@ -382,6 +382,8 @@ An Armstrong number (also known as a narcissistic number) is a number that equal
 export class GeminiService {
   static async analyzeCode(code: string, language: string): Promise<CodeAnalysisResult> {
     try {
+      console.log('Starting code analysis...');
+      
       const genAI = getGeminiClient();
       const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
       
@@ -425,7 +427,7 @@ export class GeminiService {
       const response = await result.response;
       const content = response.text();
       
-      console.log('Gemini Response:', content);
+      console.log('Gemini Response received');
       
       if (!content) {
         throw new Error('No response from Gemini');
@@ -433,13 +435,13 @@ export class GeminiService {
 
       // Use robust JSON extraction
       const cleanContent = extractJSON(content);
-      console.log('Extracted JSON:', cleanContent);
+      console.log('JSON extracted successfully');
 
       // Parse the JSON response
       const analysis = JSON.parse(cleanContent);
       
       // Validate and ensure all required fields are present
-      return {
+      const result_analysis = {
         summary: analysis.summary || "Code analysis completed",
         bugs: Array.isArray(analysis.bugs) ? analysis.bugs : [],
         optimizations: Array.isArray(analysis.optimizations) ? analysis.optimizations : [],
@@ -451,6 +453,9 @@ export class GeminiService {
         flowchart: analysis.flowchart || "graph TD\n    A[Start] --> B[Process]\n    B --> C[End]",
         explanation: analysis.explanation || "This code performs the specified functionality."
       };
+
+      console.log('Code analysis completed successfully');
+      return result_analysis;
 
     } catch (error) {
       console.error('Error analyzing code:', error);
@@ -490,6 +495,8 @@ export class GeminiService {
     }
 
     try {
+      console.log('Starting problem solving...');
+      
       const genAI = getGeminiClient();
       const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
       
@@ -547,7 +554,7 @@ export class GeminiService {
       const response = await result.response;
       const content = response.text();
       
-      console.log('Solution generated:', content);
+      console.log('Solution generated');
       
       if (!content) {
         throw new Error('No response from Gemini');
@@ -555,13 +562,13 @@ export class GeminiService {
 
       // Use robust JSON extraction
       const cleanContent = extractJSON(content);
-      console.log('Extracted JSON:', cleanContent);
+      console.log('JSON extracted successfully');
 
       // Parse the JSON response
       const solution = JSON.parse(cleanContent);
       
       // Validate and ensure all required fields are present
-      return {
+      const result_solution = {
         problem: solution.problem || problemStatement,
         language: solution.language || language,
         solution: solution.solution || "// Solution code will be generated here",
@@ -573,6 +580,9 @@ export class GeminiService {
         videoScript: solution.videoScript || "Video script will be generated here.",
         flowchart: solution.flowchart || "graph TD\n    A[Start] --> B[Process]\n    B --> C[End]"
       };
+
+      console.log('Problem solving completed successfully');
+      return result_solution;
 
     } catch (error) {
       console.error('Error solving problem:', error);
@@ -640,6 +650,7 @@ To get AI-generated solutions, you need to:
       }
       
       // Fallback solution if API fails
+      
       return {
         problem: problemStatement,
         language: language,
@@ -663,6 +674,8 @@ function solveProblem() {
 
   static async optimizeCode(code: string, language: string): Promise<OptimizationResult> {
     try {
+      console.log('Starting code optimization...');
+      
       const genAI = getGeminiClient();
       const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
       
@@ -698,23 +711,28 @@ function solveProblem() {
       const response = await result.response;
       const content = response.text();
       
+      console.log('Optimization response received');
+      
       if (!content) {
         throw new Error('No response from Gemini');
       }
 
       // Use robust JSON extraction
       const cleanContent = extractJSON(content);
-      console.log('Extracted JSON for optimization:', cleanContent);
+      console.log('JSON extracted successfully');
 
       const optimization = JSON.parse(cleanContent);
       
-      return {
+      const result_optimization = {
         code: optimization.code || code,
         improvements: Array.isArray(optimization.improvements) ? optimization.improvements : [],
         timeComplexity: optimization.timeComplexity || "O(n)",
         spaceComplexity: optimization.spaceComplexity || "O(1)",
         explanation: optimization.explanation || "Optimization analysis completed."
       };
+
+      console.log('Code optimization completed successfully');
+      return result_optimization;
 
     } catch (error) {
       console.error('Error optimizing code:', error);
@@ -729,53 +747,12 @@ function solveProblem() {
     }
   }
 
-  static async generateVideoScript(problem: string, solution: string, language: string): Promise<string> {
-    try {
-      const genAI = getGeminiClient();
-      const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
-      
-      const prompt = `
-        Create a comprehensive video script for explaining the following programming problem and solution:
-
-        **Problem:** ${problem}
-        **Language:** ${language}
-        **Solution:**
-        \`\`\`${language}
-        ${solution}
-        \`\`\`
-
-        Create a video script that includes:
-        1. Introduction to the problem
-        2. Problem analysis and approach
-        3. Step-by-step code explanation
-        4. Visual diagrams and flowchart descriptions
-        5. Complexity analysis
-        6. Alternative approaches
-        7. Conclusion and key takeaways
-
-        Format the script with clear sections, timing cues, and descriptions of visual elements that should be shown on screen.
-
-        Make it educational, engaging, and suitable for a 5-10 minute video explanation.
-      `;
-
-      const result = await model.generateContent(prompt);
-      const response = await result.response;
-      const content = response.text();
-      
-      return content || "Video script generation failed. Please try again.";
-
-    } catch (error) {
-      console.error('Error generating video script:', error);
-      return "Unable to generate video script at this time. Please check your API configuration and try again.";
-    }
-  }
-
   static async chatWithAssistant(messages: ChatMessage[]): Promise<string> {
     try {
+      console.log('Starting chat with assistant...');
+      
       const genAI = getGeminiClient();
       const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
-      
-      console.log('Sending chat request to Gemini...');
       
       // Convert messages to a single prompt for Gemini
       const conversationHistory = messages.map(msg => 
@@ -818,7 +795,7 @@ Please respond as CodeSage AI with proper formatting:`;
       const response = await result.response;
       const content = response.text();
       
-      console.log('Chat response received:', content);
+      console.log('Chat response received');
       
       return content || "I'm sorry, I couldn't process your request. Please try again.";
 
@@ -833,83 +810,11 @@ Please respond as CodeSage AI with proper formatting:`;
     }
   }
 
-  static async generateChallenges(weakAreas: string[], difficulty: string = 'medium'): Promise<any[]> {
-    try {
-      const genAI = getGeminiClient();
-      const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
-      
-      const prompt = `
-        Generate 3 coding challenges based on these weak areas: ${weakAreas.join(', ')}.
-        Difficulty level: ${difficulty}
-
-        For each challenge, provide:
-        {
-          "title": "Challenge title",
-          "description": "Clear problem description",
-          "difficulty": "${difficulty}",
-          "tags": ["relevant", "tags"],
-          "hints": ["helpful hints"],
-          "solution_approach": "Brief approach description"
-        }
-
-        Return as a JSON array of challenges. Respond ONLY with valid JSON.
-      `;
-
-      const result = await model.generateContent(prompt);
-      const response = await result.response;
-      const content = response.text();
-      
-      if (!content) {
-        throw new Error('No response from Gemini');
-      }
-
-      // Use robust JSON extraction
-      const cleanContent = extractJSON(content);
-      console.log('Extracted JSON for challenges:', cleanContent);
-
-      return JSON.parse(cleanContent);
-
-    } catch (error) {
-      console.error('Error generating challenges:', error);
-      return [];
-    }
-  }
-
-  static async explainConcept(concept: string, level: string = 'beginner'): Promise<string> {
-    try {
-      const genAI = getGeminiClient();
-      const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
-      
-      const prompt = `
-        Explain the programming concept "${concept}" for a ${level} level programmer.
-        
-        IMPORTANT: Use proper markdown formatting and code blocks.
-        
-        Include:
-        1. Clear definition
-        2. Why it's important
-        3. Simple example with properly formatted code using \`\`\`language
-        4. Common use cases
-        5. Best practices
-
-        Make it educational and easy to understand with proper formatting.
-      `;
-
-      const result = await model.generateContent(prompt);
-      const response = await result.response;
-      const content = response.text();
-      
-      return content || "I couldn't explain this concept right now. Please try again.";
-
-    } catch (error) {
-      console.error('Error explaining concept:', error);
-      return "I'm having trouble explaining this concept. Please try again.";
-    }
-  }
-
   // Test function to verify API connection
   static async testConnection(): Promise<boolean> {
     try {
+      console.log('Testing Gemini API connection...');
+      
       const genAI = getGeminiClient();
       const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
       
@@ -917,6 +822,7 @@ Please respond as CodeSage AI with proper formatting:`;
       const response = await result.response;
       const content = response.text();
       
+      console.log('Connection test result:', content?.includes('OK'));
       return content?.includes('OK') || false;
     } catch (error) {
       console.error('Connection test failed:', error);

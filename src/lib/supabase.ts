@@ -31,34 +31,6 @@ try {
   )
 }
 
-// Clear corrupted auth data on initialization
-const clearCorruptedAuthData = () => {
-  try {
-    const keys = Object.keys(localStorage);
-    const supabaseKeys = keys.filter(key => key.startsWith('sb-') && key.includes('-auth-token'));
-    
-    supabaseKeys.forEach(key => {
-      try {
-        const data = localStorage.getItem(key);
-        if (data) {
-          JSON.parse(data);
-        }
-      } catch (e) {
-        console.warn(`Clearing corrupted auth data for key: ${key}`);
-        localStorage.removeItem(key);
-      }
-    });
-  } catch (error) {
-    console.warn('Error checking auth data:', error);
-  }
-};
-
-// Clear corrupted data before creating client
-clearCorruptedAuthData();
-
-// Use a custom storage key to avoid conflicts
-const storageKey = 'codesage-auth-token';
-
 export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   auth: {
     autoRefreshToken: true,
@@ -67,24 +39,25 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
     flowType: 'pkce',
     storage: {
       getItem: (key) => {
-        const storedItem = localStorage.getItem(storageKey);
-        if (key === 'sb-auth-token') {
-          return storedItem;
+        try {
+          return localStorage.getItem(key);
+        } catch (error) {
+          console.warn('Error reading from localStorage:', error);
+          return null;
         }
-        return localStorage.getItem(key);
       },
       setItem: (key, value) => {
-        if (key === 'sb-auth-token') {
-          localStorage.setItem(storageKey, value);
-        } else {
+        try {
           localStorage.setItem(key, value);
+        } catch (error) {
+          console.warn('Error writing to localStorage:', error);
         }
       },
       removeItem: (key) => {
-        if (key === 'sb-auth-token') {
-          localStorage.removeItem(storageKey);
-        } else {
+        try {
           localStorage.removeItem(key);
+        } catch (error) {
+          console.warn('Error removing from localStorage:', error);
         }
       }
     }
@@ -95,14 +68,6 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
     }
   }
 })
-
-// Handle auth errors globally
-supabase.auth.onAuthStateChange((event, session) => {
-  if (event === 'TOKEN_REFRESHED' && !session) {
-    console.warn('Token refresh failed, clearing auth data');
-    clearCorruptedAuthData();
-  }
-});
 
 // Database types
 export interface Profile {

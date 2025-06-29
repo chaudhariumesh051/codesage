@@ -49,6 +49,8 @@ export class AuthService {
    */
   static async signUp(data: SignUpData) {
     try {
+      console.log('Starting sign up process...');
+      
       const { data: authData, error } = await supabase.auth.signUp({
         email: data.email,
         password: data.password,
@@ -60,11 +62,13 @@ export class AuthService {
       })
 
       if (error) {
+        console.error('Sign up error:', error);
         this.handleRateLimitError(error);
       }
 
+      console.log('Sign up response:', { user: authData.user?.id, session: !!authData.session });
+
       if (authData.user && !authData.session) {
-        showToast.info('Please check your email to verify your account')
         return { user: null, needsVerification: true }
       }
 
@@ -80,14 +84,19 @@ export class AuthService {
    */
   static async signIn(data: SignInData) {
     try {
+      console.log('Starting sign in process...');
+      
       const { data: authData, error } = await supabase.auth.signInWithPassword({
         email: data.email,
         password: data.password
       })
 
       if (error) {
+        console.error('Sign in error:', error);
         throw error
       }
+
+      console.log('Sign in successful:', authData.user?.id);
 
       // Log successful login
       await this.logSecurityEvent('login_success', 'User signed in successfully')
@@ -108,14 +117,19 @@ export class AuthService {
    */
   static async signOut() {
     try {
+      console.log('Starting sign out process...');
+      
       // Log logout event
       await this.logSecurityEvent('logout', 'User signed out')
 
       const { error } = await supabase.auth.signOut()
       
       if (error) {
+        console.error('Sign out error:', error);
         throw error
       }
+
+      console.log('Sign out successful');
     } catch (error) {
       console.error('Sign out error:', error)
       throw error
@@ -127,18 +141,21 @@ export class AuthService {
    */
   static async resetPassword(email: string) {
     try {
+      console.log('Starting password reset...');
+      
       const { error } = await supabase.auth.resetPasswordForEmail(email, {
         redirectTo: `${window.location.origin}/auth/reset-password`
       })
 
       if (error) {
+        console.error('Password reset error:', error);
         this.handleRateLimitError(error);
       }
 
       // Log password reset request
       await this.logSecurityEvent('password_reset_requested', 'Password reset requested')
 
-      showToast.success('Password reset email sent!')
+      console.log('Password reset email sent');
     } catch (error) {
       console.error('Password reset error:', error)
       throw error
