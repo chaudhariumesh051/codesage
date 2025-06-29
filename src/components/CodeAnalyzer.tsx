@@ -4,7 +4,7 @@ import { CodeEditor } from './CodeEditor';
 import { AnalysisPanel } from './AnalysisPanel';
 import { FlowchartViewer } from './FlowchartViewer';
 import { GeminiService, CodeAnalysisResult } from '../services/gemini';
-import { AlertCircle, CheckCircle } from 'lucide-react';
+import { AlertCircle, CheckCircle, AlertTriangle } from 'lucide-react';
 
 export const CodeAnalyzer: React.FC = () => {
   const [code, setCode] = useState('');
@@ -110,7 +110,7 @@ export const CodeAnalyzer: React.FC = () => {
             ) : apiStatus === 'error' ? (
               <>
                 <AlertCircle className="w-4 h-4" />
-                <span>AI Disconnected</span>
+                <span>AI Disconnected - Using Fallback Mode</span>
               </>
             ) : (
               <>
@@ -124,6 +124,31 @@ export const CodeAnalyzer: React.FC = () => {
             )}
           </div>
         </div>
+
+        {/* API Configuration Notice */}
+        {apiStatus === 'error' && (
+          <motion.div
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="mt-4 p-4 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg"
+          >
+            <div className="flex items-start space-x-3">
+              <AlertTriangle className="w-5 h-5 text-amber-600 dark:text-amber-400 mt-0.5" />
+              <div className="text-left">
+                <h3 className="text-sm font-semibold text-amber-800 dark:text-amber-300">
+                  Gemini AI Not Configured
+                </h3>
+                <p className="text-xs text-amber-700 dark:text-amber-400 mt-1">
+                  To enable AI-powered analysis, add your Gemini API key to the .env file. 
+                  Basic analysis is still available using built-in algorithms.
+                </p>
+                <div className="mt-2 text-xs text-amber-600 dark:text-amber-500">
+                  <strong>Steps:</strong> Get API key from Google AI Studio → Update .env file → Restart server
+                </div>
+              </div>
+            </div>
+          </motion.div>
+        )}
       </motion.div>
 
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-6 h-full">
@@ -209,11 +234,13 @@ export const CodeAnalyzer: React.FC = () => {
                   </motion.div>
                 </div>
                 <h3 className="text-xl font-semibold text-gray-900 dark:text-gray-100 mb-2">
-                  {isAnalyzing ? 'Gemini AI is Analyzing Your Code...' : 'Ready to Analyze'}
+                  {isAnalyzing ? 'Analyzing Your Code...' : 'Ready to Analyze'}
                 </h3>
                 <p className="text-gray-600 dark:text-gray-400">
                   {isAnalyzing 
-                    ? 'Our Gemini AI is examining your code for bugs, optimizations, and insights...'
+                    ? apiStatus === 'connected' 
+                      ? 'Gemini AI is examining your code for bugs, optimizations, and insights...'
+                      : 'Using built-in analysis algorithms to examine your code...'
                     : 'Paste your code in the editor and click "Analyze Code" to get started'
                   }
                 </p>

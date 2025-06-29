@@ -25,18 +25,22 @@ export const Dashboard: React.FC = () => {
     try {
       setIsLoading(true);
       
-      // Load user stats
+      // First, ensure user profile exists
+      await ensureUserProfile();
+      
+      // Load user stats with better error handling
       const { data: userProfile, error: profileError } = await supabase
         .from('user_profiles')
         .select('total_analyses, total_problems_solved')
         .eq('id', user.id)
-        .single();
+        .maybeSingle(); // Use maybeSingle() instead of single() to handle no rows gracefully
         
       if (profileError) {
-        throw profileError;
+        console.error('Profile error:', profileError);
+        // Continue with default values instead of throwing
       }
       
-      // Load recent code analyses
+      // Load recent code analyses with error handling
       const { data: analyses, error: analysesError } = await supabase
         .from('code_analyses')
         .select('*, code_submissions(*)')
@@ -45,10 +49,11 @@ export const Dashboard: React.FC = () => {
         .limit(2);
         
       if (analysesError) {
-        throw analysesError;
+        console.error('Analyses error:', analysesError);
+        // Continue with empty array
       }
       
-      // Load recent problem solutions
+      // Load recent problem solutions with error handling
       const { data: solutions, error: solutionsError } = await supabase
         .from('problem_solutions')
         .select('*')
@@ -57,18 +62,19 @@ export const Dashboard: React.FC = () => {
         .limit(2);
         
       if (solutionsError) {
-        throw solutionsError;
+        console.error('Solutions error:', solutionsError);
+        // Continue with empty array
       }
       
       // Calculate time saved (rough estimate based on activity)
       const totalActivities = (userProfile?.total_analyses || 0) + (userProfile?.total_problems_solved || 0);
       const estimatedTimeSaved = Math.round(totalActivities * 1.5); // 1.5 hours per activity
       
-      // Update stats
+      // Update stats with safe defaults
       setStats({
         totalAnalyses: userProfile?.total_analyses || 0,
         totalProblemsSolved: userProfile?.total_problems_solved || 0,
-        currentStreak: calculateStreak(analyses, solutions),
+        currentStreak: calculateStreak(analyses || [], solutions || []),
         timeSaved: `${estimatedTimeSaved}h`
       });
       
@@ -92,8 +98,45 @@ export const Dashboard: React.FC = () => {
       setRecentActivity(activity.slice(0, 4));
     } catch (error) {
       console.error('Error loading user data:', error);
+      // Set default values on error
+      setStats({
+        totalAnalyses: 0,
+        totalProblemsSolved: 0,
+        currentStreak: 0,
+        timeSaved: '0h'
+      });
+      setRecentActivity([]);
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const ensureUserProfile = async () => {
+    try {
+      // Check if profile exists
+      const { data: existingProfile } = await supabase
+        .from('user_profiles')
+        .select('id')
+        .eq('id', user.id)
+        .maybeSingle();
+
+      // If no profile exists, create one
+      if (!existingProfile) {
+        const { error: insertError } = await supabase
+          .from('user_profiles')
+          .insert({
+            id: user.id,
+            full_name: user.user_metadata?.full_name || user.email?.split('@')[0] || 'User',
+            total_analyses: 0,
+            total_problems_solved: 0
+          });
+
+        if (insertError) {
+          console.error('Error creating user profile:', insertError);
+        }
+      }
+    } catch (error) {
+      console.error('Error ensuring user profile:', error);
     }
   };
 
