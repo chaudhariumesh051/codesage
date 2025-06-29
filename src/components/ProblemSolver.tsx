@@ -1,11 +1,10 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Brain, 
   Play, 
   Code, 
   Zap, 
-  Video, 
   Download, 
   Copy, 
   Check, 
@@ -14,15 +13,13 @@ import {
   Clock,
   Target,
   Lightbulb,
-  FileText,
-  Settings,
-  Crown
+  FileText
 } from 'lucide-react';
 import { GeminiService } from '../services/gemini';
-import { VideoGenerator } from './VideoGenerator';
 import { CodeCompiler } from './CodeCompiler';
-import { useSubscriptionStore } from '../stores/subscriptionStore';
+import { useAuth } from './AuthProvider';
 import { showToast } from './Toast';
+import { supabase } from '../lib/supabase';
 
 interface ProblemSolution {
   problem: string;
@@ -38,7 +35,6 @@ interface ProblemSolution {
     actualOutput?: string;
     passed?: boolean;
   }>;
-  videoScript: string;
   flowchart: string;
 }
 
@@ -51,14 +47,16 @@ interface ExecutionResult {
 }
 
 export const ProblemSolver: React.FC = () => {
-  const { subscription, canUseFeature, updateUsage } = useSubscriptionStore();
+  const { user } = useAuth();
   const [problemStatement, setProblemStatement] = useState('');
   const [selectedLanguage, setSelectedLanguage] = useState('javascript');
   const [solution, setSolution] = useState<ProblemSolution | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
   const [executionResult, setExecutionResult] = useState<ExecutionResult | null>(null);
-  const [activeTab, setActiveTab] = useState<'solution' | 'execution' | 'optimization' | 'video'>('solution');
+  const [activeTab, setActiveTab] = useState<'solution' | 'execution' | 'optimization'>('solution');
   const [copied, setCopied] = useState(false);
+  const [userSolutions, setUserSolutions] = useState<any[]>([]);
+  const [isLoadingSolutions, setIsLoadingSolutions] = useState(false);
 
   const languages = [
     { value: 'javascript', label: 'JavaScript', color: 'bg-yellow-500' },
@@ -79,19 +77,40 @@ export const ProblemSolver: React.FC = () => {
     "Implement a binary search algorithm",
     "Sort an array using merge sort algorithm",
     "Find the maximum depth of a binary tree",
-    "Check if a string has balanced parentheses",
-    "Implement a LRU cache with O(1) operations"
+    "Check if a string has balanced parentheses"
   ];
+
+  useEffect(() => {
+    if (user) {
+      loadUserSolutions();
+    }
+  }, [user]);
+
+  const loadUserSolutions = async () => {
+    try {
+      setIsLoadingSolutions(true);
+      
+      const { data, error } = await supabase
+        .from('problem_solutions')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false });
+        
+      if (error) {
+        throw error;
+      }
+      
+      setUserSolutions(data || []);
+    } catch (error) {
+      console.error('Error loading user solutions:', error);
+    } finally {
+      setIsLoadingSolutions(false);
+    }
+  };
 
   const handleGenerateSolution = async () => {
     if (!problemStatement.trim()) {
       showToast.error('Please enter a problem statement');
-      return;
-    }
-
-    // Check if user can use problem solving feature
-    if (!canUseFeature('problemSolving')) {
-      showToast.upgrade('You\'ve reached your daily problem solving limit. Upgrade to Pro for unlimited access!');
       return;
     }
     
@@ -101,9 +120,9 @@ export const ProblemSolver: React.FC = () => {
       setSolution(result);
       setActiveTab('solution');
       
-      // Update usage for free users
-      if (!subscription.isActive) {
-        updateUsage('problemSolving');
+      // Save solution to database
+      if (user) {
+        await saveSolution(result);
       }
       
       showToast.success('Solution generated successfully! 🎉');
@@ -112,6 +131,40 @@ export const ProblemSolver: React.FC = () => {
       showToast.error('Failed to generate solution. Please try again.');
     } finally {
       setIsGenerating(false);
+    }
+  };
+
+  const saveSolution = async (solution: ProblemSolution) => {
+    try {
+      const { data, error } = await supabase
+        .from('problem_solutions')
+        .insert({
+          user_id: user.id,
+          problem_title: solution.problem.substring(0, 100),
+          problem_statement: solution.problem,
+          language: solution.language,
+          solution_code: solution.solution,
+          explanation: solution.explanation,
+          time_complexity: solution.timeComplexity,
+          space_complexity: solution.spaceComplexity,
+          test_cases: solution.testCases,
+          optimizations: solution.optimizations
+        });
+        
+      if (error) {
+        throw error;
+      }
+      
+      // Refresh user solutions
+      loadUserSolutions();
+      
+      // Update user stats
+      await supabase.rpc('increment_usage_count', {
+        user_id_param: user.id,
+        feature_type: 'problem_solving'
+      });
+    } catch (error) {
+      console.error('Error saving solution:', error);
     }
   };
 
@@ -186,6 +239,25 @@ ${solution.testCases.map(test => `Input: ${test.input} | Expected: ${test.expect
     showToast.success('Solution downloaded!');
   };
 
+  const loadSavedSolution = (savedSolution: any) => {
+    const formattedSolution: ProblemSolution = {
+      problem: savedSolution.problem_statement,
+      language: savedSolution.language,
+      solution: savedSolution.solution_code,
+      explanation: savedSolution.explanation,
+      timeComplexity: savedSolution.time_complexity,
+      spaceComplexity: savedSolution.space_complexity,
+      optimizations: savedSolution.optimizations || [],
+      testCases: savedSolution.test_cases || [],
+      flowchart: savedSolution.flowchart || "graph TD\n    A[Start] --> B[Process]\n    B --> C[End]"
+    };
+    
+    setProblemStatement(savedSolution.problem_statement);
+    setSelectedLanguage(savedSolution.language);
+    setSolution(formattedSolution);
+    setActiveTab('solution');
+  };
+
   const containerVariants = {
     hidden: { opacity: 0 },
     visible: {
@@ -214,29 +286,71 @@ ${solution.testCases.map(test => `Input: ${test.input} | Expected: ${test.expect
           AI Problem Solver
         </h1>
         <p className="text-gray-600 dark:text-gray-400">
-          Describe any programming problem and get complete solutions with code generation, execution, and AI video explanations
+          Describe any programming problem and get complete solutions with code generation and execution
         </p>
       </motion.div>
 
-      {/* Usage Indicator for Free Users */}
-      {!subscription.isActive && (
-        <motion.div variants={itemVariants} className="bg-orange-50 dark:bg-orange-900/20 rounded-xl p-4 border border-orange-200 dark:border-orange-800">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-3">
-              <Target className="w-5 h-5 text-orange-600 dark:text-orange-400" />
-              <span className="text-orange-800 dark:text-orange-300 font-medium">
-                Free Plan: {subscription.dailyUsage.problemSolving}/3 problems solved today
-              </span>
-            </div>
-            <motion.button
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
-              onClick={() => showToast.upgrade('Upgrade to Pro for unlimited problem solving!')}
-              className="flex items-center space-x-2 px-4 py-2 bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-lg font-medium hover:from-purple-700 hover:to-pink-700 transition-all"
-            >
-              <Crown className="w-4 h-4" />
-              <span>Upgrade</span>
-            </motion.button>
+      {/* Previous Solutions */}
+      {userSolutions.length > 0 && (
+        <motion.div variants={itemVariants} className="bg-white dark:bg-dark-800 rounded-2xl border border-gray-200 dark:border-dark-700 p-6 shadow-lg">
+          <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">Your Previous Solutions</h2>
+          
+          <div className="overflow-x-auto">
+            <table className="min-w-full divide-y divide-gray-200 dark:divide-dark-700">
+              <thead>
+                <tr>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Problem</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Language</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Date</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Action</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-200 dark:divide-dark-700">
+                {isLoadingSolutions ? (
+                  <tr>
+                    <td colSpan={4} className="px-4 py-4 text-center">
+                      <div className="flex justify-center">
+                        <div className="w-6 h-6 border-2 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
+                      </div>
+                    </td>
+                  </tr>
+                ) : userSolutions.length === 0 ? (
+                  <tr>
+                    <td colSpan={4} className="px-4 py-4 text-center text-gray-500 dark:text-gray-400">
+                      No solutions found
+                    </td>
+                  </tr>
+                ) : (
+                  userSolutions.slice(0, 5).map((solution) => (
+                    <tr key={solution.id} className="hover:bg-gray-50 dark:hover:bg-dark-700">
+                      <td className="px-4 py-4">
+                        <div className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate max-w-xs">
+                          {solution.problem_title}
+                        </div>
+                      </td>
+                      <td className="px-4 py-4">
+                        <span className="px-2 py-1 text-xs rounded-full bg-blue-100 dark:bg-blue-900/20 text-blue-800 dark:text-blue-300">
+                          {solution.language}
+                        </span>
+                      </td>
+                      <td className="px-4 py-4 text-sm text-gray-500 dark:text-gray-400">
+                        {new Date(solution.created_at).toLocaleDateString()}
+                      </td>
+                      <td className="px-4 py-4">
+                        <motion.button
+                          whileHover={{ scale: 1.05 }}
+                          whileTap={{ scale: 0.95 }}
+                          onClick={() => loadSavedSolution(solution)}
+                          className="px-3 py-1 text-xs bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                        >
+                          Load
+                        </motion.button>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
           </div>
         </motion.div>
       )}
@@ -314,7 +428,7 @@ ${solution.testCases.map(test => `Input: ${test.input} | Expected: ${test.expect
             whileHover={{ scale: 1.02 }}
             whileTap={{ scale: 0.98 }}
             onClick={handleGenerateSolution}
-            disabled={isGenerating || !problemStatement.trim() || (!subscription.isActive && !canUseFeature('problemSolving'))}
+            disabled={isGenerating || !problemStatement.trim()}
             className="w-full flex items-center justify-center space-x-2 px-6 py-4 bg-gradient-to-r from-green-600 to-blue-600 text-white rounded-xl font-semibold hover:from-green-700 hover:to-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-lg hover:shadow-xl"
           >
             {isGenerating ? (
@@ -326,11 +440,6 @@ ${solution.testCases.map(test => `Input: ${test.input} | Expected: ${test.expect
                   <Brain className="w-5 h-5" />
                 </motion.div>
                 <span>Generating Solution...</span>
-              </>
-            ) : !subscription.isActive && !canUseFeature('problemSolving') ? (
-              <>
-                <Crown className="w-5 h-5" />
-                <span>Daily Limit Reached - Upgrade to Continue</span>
               </>
             ) : (
               <>
@@ -357,8 +466,7 @@ ${solution.testCases.map(test => `Input: ${test.input} | Expected: ${test.expect
                 {[
                   { id: 'solution', label: 'Solution', icon: Code },
                   { id: 'execution', label: 'Run Code', icon: Play },
-                  { id: 'optimization', label: 'Optimize', icon: Zap },
-                  { id: 'video', label: 'AI Video', icon: Video }
+                  { id: 'optimization', label: 'Optimize', icon: Zap }
                 ].map((tab) => {
                   const Icon = tab.icon;
                   return (
@@ -374,9 +482,6 @@ ${solution.testCases.map(test => `Input: ${test.input} | Expected: ${test.expect
                     >
                       <Icon className="w-4 h-4" />
                       <span>{tab.label}</span>
-                      {tab.id === 'video' && !subscription.isActive && (
-                        <Crown className="w-3 h-3 text-yellow-500" />
-                      )}
                     </motion.button>
                   );
                 })}
@@ -512,25 +617,6 @@ ${solution.testCases.map(test => `Input: ${test.input} | Expected: ${test.expect
                         ))}
                       </div>
                     )}
-                  </motion.div>
-                )}
-
-                {activeTab === 'video' && (
-                  <motion.div
-                    key="video"
-                    initial={{ opacity: 0, x: 20 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    exit={{ opacity: 0, x: -20 }}
-                  >
-                    <VideoGenerator
-                      problemTitle={solution.problem}
-                      script={solution.videoScript || solution.explanation}
-                      language={selectedLanguage}
-                      onVideoGenerated={(video) => {
-                        console.log('Video generated:', video);
-                        showToast.success('Video explanation generated! 🎬');
-                      }}
-                    />
                   </motion.div>
                 )}
               </AnimatePresence>

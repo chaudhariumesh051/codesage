@@ -9,7 +9,7 @@ interface AuthContextType {
   profile: any;
   isLoading: boolean;
   isAuthenticated: boolean;
-  openAuthModal: (mode?: 'signin' | 'signup') => void;
+  openAuthModal: (mode?: 'signin' | 'signup' | 'forgot-password') => void;
   signOut: () => Promise<void>;
   refreshUser: () => Promise<void>;
 }
@@ -29,7 +29,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [profile, setProfile] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [showAuthModal, setShowAuthModal] = useState(false);
-  const [initialAuthMode, setInitialAuthMode] = useState<'signin' | 'signup'>('signin');
+  const [initialAuthMode, setInitialAuthMode] = useState<'signin' | 'signup' | 'forgot-password'>('signin');
 
   useEffect(() => {
     // Check for active session on mount
@@ -146,7 +146,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  const openAuthModal = (mode: 'signin' | 'signup' = 'signin') => {
+  const openAuthModal = (mode: 'signin' | 'signup' | 'forgot-password' = 'signin') => {
     setInitialAuthMode(mode);
     setShowAuthModal(true);
   };

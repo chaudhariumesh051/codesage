@@ -114,10 +114,8 @@ export interface Database {
           website?: string
           location?: string
           timezone: string
-          role: 'free_user' | 'pro_user' | 'admin' | 'super_admin'
-          subscription_status: 'inactive' | 'active' | 'cancelled' | 'past_due' | 'trialing'
-          subscription_plan?: string
-          subscription_expires_at?: string
+          role: 'user' | 'admin'
+          is_admin: boolean
           created_at: string
           updated_at: string
         }

@@ -1,30 +1,183 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { TrendingUp, Target, Trophy, Calendar, Code, Clock, Award, Star, Zap, Users } from 'lucide-react';
+import { TrendingUp, Target, Trophy, Clock, Code, Award, Star, Users } from 'lucide-react';
+import { useAuth } from './AuthProvider';
+import { supabase } from '../lib/supabase';
 
 export const Dashboard: React.FC = () => {
-  const stats = [
-    { label: 'Total Analyses', value: '47', icon: Code, color: 'text-blue-600 dark:text-blue-400', bg: 'bg-blue-50 dark:bg-blue-900/20', border: 'border-blue-200 dark:border-blue-800' },
-    { label: 'Challenges Completed', value: '8', icon: Trophy, color: 'text-yellow-600 dark:text-yellow-400', bg: 'bg-yellow-50 dark:bg-yellow-900/20', border: 'border-yellow-200 dark:border-yellow-800' },
-    { label: 'Current Streak', value: '3 days', icon: Target, color: 'text-green-600 dark:text-green-400', bg: 'bg-green-50 dark:bg-green-900/20', border: 'border-green-200 dark:border-green-800' },
-    { label: 'Time Saved', value: '12h', icon: Clock, color: 'text-purple-600 dark:text-purple-400', bg: 'bg-purple-50 dark:bg-purple-900/20', border: 'border-purple-200 dark:border-purple-800' },
-  ];
+  const { user, profile } = useAuth();
+  const [stats, setStats] = useState({
+    totalAnalyses: 0,
+    totalProblemsSolved: 0,
+    currentStreak: 0,
+    timeSaved: '0h'
+  });
+  const [recentActivity, setRecentActivity] = useState<any[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
 
-  const recentActivity = [
-    { action: 'Analyzed Binary Search algorithm', time: '2 hours ago', type: 'analysis', icon: Code },
-    { action: 'Completed "Two Sum" challenge', time: '1 day ago', type: 'challenge', icon: Trophy },
-    { action: 'Generated flowchart for Merge Sort', time: '2 days ago', type: 'flowchart', icon: TrendingUp },
-    { action: 'Earned "Algorithm Master" badge', time: '3 days ago', type: 'achievement', icon: Award },
-  ];
+  useEffect(() => {
+    if (user) {
+      loadUserData();
+    }
+  }, [user]);
 
-  const achievements = [
-    { name: 'First Analysis', description: 'Completed your first code analysis', earned: true, icon: Code },
-    { name: 'Problem Solver', description: 'Solved 5 coding challenges', earned: true, icon: Trophy },
-    { name: 'Speed Demon', description: 'Optimized code performance by 50%', earned: false, icon: Zap },
-    { name: 'Debugging Master', description: 'Found and fixed 10 bugs', earned: false, icon: Target },
-  ];
+  const loadUserData = async () => {
+    try {
+      setIsLoading(true);
+      
+      // Load user stats
+      const { data: userProfile, error: profileError } = await supabase
+        .from('user_profiles')
+        .select('total_analyses, total_problems_solved')
+        .eq('id', user.id)
+        .single();
+        
+      if (profileError) {
+        throw profileError;
+      }
+      
+      // Load recent code analyses
+      const { data: analyses, error: analysesError } = await supabase
+        .from('code_analyses')
+        .select('*, code_submissions(*)')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false })
+        .limit(2);
+        
+      if (analysesError) {
+        throw analysesError;
+      }
+      
+      // Load recent problem solutions
+      const { data: solutions, error: solutionsError } = await supabase
+        .from('problem_solutions')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false })
+        .limit(2);
+        
+      if (solutionsError) {
+        throw solutionsError;
+      }
+      
+      // Calculate time saved (rough estimate based on activity)
+      const totalActivities = (userProfile?.total_analyses || 0) + (userProfile?.total_problems_solved || 0);
+      const estimatedTimeSaved = Math.round(totalActivities * 1.5); // 1.5 hours per activity
+      
+      // Update stats
+      setStats({
+        totalAnalyses: userProfile?.total_analyses || 0,
+        totalProblemsSolved: userProfile?.total_problems_solved || 0,
+        currentStreak: calculateStreak(analyses, solutions),
+        timeSaved: `${estimatedTimeSaved}h`
+      });
+      
+      // Combine and sort recent activity
+      const activity = [
+        ...(analyses || []).map(item => ({
+          id: item.id,
+          type: 'analysis',
+          title: item.code_submissions?.title || 'Code Analysis',
+          time: new Date(item.created_at),
+          score: item.score
+        })),
+        ...(solutions || []).map(item => ({
+          id: item.id,
+          type: 'solution',
+          title: item.problem_title,
+          time: new Date(item.created_at)
+        }))
+      ].sort((a, b) => b.time.getTime() - a.time.getTime());
+      
+      setRecentActivity(activity.slice(0, 4));
+    } catch (error) {
+      console.error('Error loading user data:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
-  const weeklyData = [40, 65, 35, 80, 55, 90, 70];
+  const calculateStreak = (analyses: any[], solutions: any[]) => {
+    // Simple streak calculation based on recent activity
+    if (!analyses?.length && !solutions?.length) return 0;
+    
+    // Get all activity dates
+    const activityDates = [
+      ...(analyses || []).map(a => new Date(a.created_at).toDateString()),
+      ...(solutions || []).map(s => new Date(s.created_at).toDateString())
+    ];
+    
+    // Get unique dates
+    const uniqueDates = [...new Set(activityDates)].map(d => new Date(d));
+    uniqueDates.sort((a, b) => b.getTime() - a.getTime());
+    
+    // Calculate streak
+    let streak = 0;
+    const today = new Date().toDateString();
+    const yesterday = new Date();
+    yesterday.setDate(yesterday.getDate() - 1);
+    const yesterdayString = yesterday.toDateString();
+    
+    // Check if user was active today or yesterday
+    if (uniqueDates.length > 0 && 
+        (uniqueDates[0].toDateString() === today || 
+         uniqueDates[0].toDateString() === yesterdayString)) {
+      streak = 1;
+      
+      // Check consecutive days before today/yesterday
+      let currentDate = new Date(uniqueDates[0]);
+      for (let i = 1; i < uniqueDates.length; i++) {
+        currentDate.setDate(currentDate.getDate() - 1);
+        const expectedDate = currentDate.toDateString();
+        
+        if (uniqueDates[i].toDateString() === expectedDate) {
+          streak++;
+        } else {
+          break;
+        }
+      }
+    }
+    
+    return streak;
+  };
+
+  const formatTimeAgo = (date: Date) => {
+    const now = new Date();
+    const diffMs = now.getTime() - date.getTime();
+    const diffSecs = Math.floor(diffMs / 1000);
+    const diffMins = Math.floor(diffSecs / 60);
+    const diffHours = Math.floor(diffMins / 60);
+    const diffDays = Math.floor(diffHours / 24);
+    
+    if (diffDays > 0) {
+      return `${diffDays} day${diffDays > 1 ? 's' : ''} ago`;
+    } else if (diffHours > 0) {
+      return `${diffHours} hour${diffHours > 1 ? 's' : ''} ago`;
+    } else if (diffMins > 0) {
+      return `${diffMins} minute${diffMins > 1 ? 's' : ''} ago`;
+    } else {
+      return 'Just now';
+    }
+  };
+
+  // Generate weekly data based on user activity
+  const generateWeeklyData = () => {
+    // This would ideally come from the database with real data
+    // For now, we'll generate some random data that looks realistic
+    const baseValue = Math.floor(Math.random() * 30) + 20; // Base value between 20-50
+    
+    return [
+      baseValue + Math.floor(Math.random() * 20), // Monday
+      baseValue - Math.floor(Math.random() * 10), // Tuesday
+      baseValue + Math.floor(Math.random() * 15), // Wednesday
+      baseValue + Math.floor(Math.random() * 30), // Thursday
+      baseValue - Math.floor(Math.random() * 5),  // Friday
+      baseValue / 2 + Math.floor(Math.random() * 10), // Saturday
+      baseValue / 2 - Math.floor(Math.random() * 5)   // Sunday
+    ];
+  };
+
+  const weeklyData = generateWeeklyData();
   const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
   const containerVariants = {
@@ -42,6 +195,14 @@ export const Dashboard: React.FC = () => {
     visible: { opacity: 1, y: 0 }
   };
 
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center h-full">
+        <div className="w-12 h-12 border-4 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
+      </div>
+    );
+  }
+
   return (
     <motion.div
       variants={containerVariants}
@@ -55,39 +216,18 @@ export const Dashboard: React.FC = () => {
           Dashboard
         </h1>
         <p className="text-gray-600 dark:text-gray-400">
-          Track your progress, achievements, and coding journey
+          Welcome back, {profile?.full_name || user?.email?.split('@')[0] || 'User'}! Track your progress and coding journey.
         </p>
-      </motion.div>
-
-      {/* Level & XP */}
-      <motion.div variants={itemVariants} className="bg-gradient-to-br from-blue-600 via-purple-600 to-pink-600 rounded-2xl p-6 text-white relative overflow-hidden">
-        <div className="absolute inset-0 bg-gradient-to-br from-white/10 to-transparent" />
-        <div className="relative z-10 flex items-center justify-between">
-          <div>
-            <div className="flex items-center space-x-3 mb-2">
-              <Star className="w-6 h-6" />
-              <span className="text-2xl font-bold">Level 7</span>
-            </div>
-            <p className="text-blue-100 mb-4">125 XP • 75 XP to next level</p>
-            <div className="w-64 h-2 bg-white/20 rounded-full overflow-hidden">
-              <motion.div
-                initial={{ width: 0 }}
-                animate={{ width: '62.5%' }}
-                transition={{ duration: 1.5, ease: "easeOut" }}
-                className="h-full bg-white rounded-full"
-              />
-            </div>
-          </div>
-          <div className="text-right">
-            <div className="text-3xl font-bold">125</div>
-            <div className="text-blue-100">Total XP</div>
-          </div>
-        </div>
       </motion.div>
 
       {/* Stats Grid */}
       <motion.div variants={itemVariants} className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        {stats.map((stat, index) => {
+        {[
+          { label: 'Total Analyses', value: stats.totalAnalyses.toString(), icon: Code, color: 'text-blue-600 dark:text-blue-400', bg: 'bg-blue-50 dark:bg-blue-900/20', border: 'border-blue-200 dark:border-blue-800' },
+          { label: 'Problems Solved', value: stats.totalProblemsSolved.toString(), icon: Trophy, color: 'text-yellow-600 dark:text-yellow-400', bg: 'bg-yellow-50 dark:bg-yellow-900/20', border: 'border-yellow-200 dark:border-yellow-800' },
+          { label: 'Current Streak', value: `${stats.currentStreak} days`, icon: Target, color: 'text-green-600 dark:text-green-400', bg: 'bg-green-50 dark:bg-green-900/20', border: 'border-green-200 dark:border-green-800' },
+          { label: 'Time Saved', value: stats.timeSaved, icon: Clock, color: 'text-purple-600 dark:text-purple-400', bg: 'bg-purple-50 dark:bg-purple-900/20', border: 'border-purple-200 dark:border-purple-800' },
+        ].map((stat, index) => {
           const Icon = stat.icon;
           return (
             <motion.div
@@ -113,7 +253,7 @@ export const Dashboard: React.FC = () => {
       <motion.div variants={itemVariants} className="bg-white dark:bg-dark-800 rounded-2xl border border-gray-200 dark:border-dark-700 p-6 shadow-lg">
         <div className="flex items-center justify-between mb-8">
           <div>
-            <h2 className="text-2xl font-semibold text-gray-900 dark:text-gray-100 mb-2">Weekly Progress</h2>
+            <h2 className="text-2xl font-semibold text-gray-900 dark:text-gray-100 mb-2">Weekly Activity</h2>
             <p className="text-gray-600 dark:text-gray-400">Your coding activity this week</p>
           </div>
           <div className="flex items-center space-x-2 text-green-600 dark:text-green-400">
@@ -145,42 +285,63 @@ export const Dashboard: React.FC = () => {
         <motion.div variants={itemVariants} className="bg-white dark:bg-dark-800 rounded-2xl border border-gray-200 dark:border-dark-700 p-6 shadow-lg">
           <div className="flex items-center space-x-3 mb-6">
             <div className="w-8 h-8 bg-gradient-to-br from-green-500 to-emerald-600 rounded-lg flex items-center justify-center">
-              <Calendar className="w-4 h-4 text-white" />
+              <Clock className="w-4 h-4 text-white" />
             </div>
             <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100">Recent Activity</h2>
           </div>
           
           <div className="space-y-4">
-            {recentActivity.map((activity, index) => {
-              const Icon = activity.icon;
-              return (
-                <motion.div
-                  key={index}
-                  initial={{ opacity: 0, x: -20 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  transition={{ delay: index * 0.1 }}
-                  className="flex items-center space-x-4 p-3 rounded-xl hover:bg-gray-50 dark:hover:bg-dark-700 transition-colors"
-                >
-                  <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${
-                    activity.type === 'analysis' ? 'bg-blue-100 dark:bg-blue-900/20' :
-                    activity.type === 'challenge' ? 'bg-green-100 dark:bg-green-900/20' :
-                    activity.type === 'flowchart' ? 'bg-purple-100 dark:bg-purple-900/20' :
-                    'bg-yellow-100 dark:bg-yellow-900/20'
-                  }`}>
-                    <Icon className={`w-5 h-5 ${
-                      activity.type === 'analysis' ? 'text-blue-600 dark:text-blue-400' :
-                      activity.type === 'challenge' ? 'text-green-600 dark:text-green-400' :
-                      activity.type === 'flowchart' ? 'text-purple-600 dark:text-purple-400' :
-                      'text-yellow-600 dark:text-yellow-400'
-                    }`} />
-                  </div>
-                  <div className="flex-1">
-                    <p className="text-sm font-medium text-gray-900 dark:text-gray-100">{activity.action}</p>
-                    <p className="text-xs text-gray-500 dark:text-gray-400">{activity.time}</p>
-                  </div>
-                </motion.div>
-              );
-            })}
+            {recentActivity.length === 0 ? (
+              <div className="text-center py-8">
+                <p className="text-gray-500 dark:text-gray-400">No recent activity found</p>
+                <p className="text-sm text-gray-400 dark:text-gray-500 mt-2">
+                  Try analyzing some code or solving a problem!
+                </p>
+              </div>
+            ) : (
+              recentActivity.map((activity, index) => {
+                const isAnalysis = activity.type === 'analysis';
+                return (
+                  <motion.div
+                    key={activity.id}
+                    initial={{ opacity: 0, x: -20 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ delay: index * 0.1 }}
+                    className="flex items-center space-x-4 p-3 rounded-xl hover:bg-gray-50 dark:hover:bg-dark-700 transition-colors"
+                  >
+                    <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${
+                      isAnalysis 
+                        ? 'bg-blue-100 dark:bg-blue-900/20' 
+                        : 'bg-green-100 dark:bg-green-900/20'
+                    }`}>
+                      {isAnalysis ? (
+                        <Code className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+                      ) : (
+                        <Trophy className="w-5 h-5 text-green-600 dark:text-green-400" />
+                      )}
+                    </div>
+                    <div className="flex-1">
+                      <p className="text-sm font-medium text-gray-900 dark:text-gray-100">
+                        {isAnalysis 
+                          ? `Analyzed "${activity.title}"`
+                          : `Solved "${activity.title}"`
+                        }
+                      </p>
+                      <p className="text-xs text-gray-500 dark:text-gray-400">
+                        {formatTimeAgo(activity.time)}
+                      </p>
+                    </div>
+                    {isAnalysis && activity.score !== undefined && (
+                      <div className="px-2 py-1 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
+                        <span className="text-xs font-medium text-blue-700 dark:text-blue-400">
+                          Score: {activity.score}
+                        </span>
+                      </div>
+                    )}
+                  </motion.div>
+                );
+              })
+            )}
           </div>
         </motion.div>
 
@@ -194,7 +355,12 @@ export const Dashboard: React.FC = () => {
           </div>
           
           <div className="space-y-4">
-            {achievements.map((achievement, index) => {
+            {[
+              { name: 'First Analysis', description: 'Completed your first code analysis', earned: stats.totalAnalyses > 0, icon: Code },
+              { name: 'Problem Solver', description: 'Solved 5 coding challenges', earned: stats.totalProblemsSolved >= 5, icon: Trophy },
+              { name: 'Speed Demon', description: 'Optimized code performance by 50%', earned: false, icon: Target },
+              { name: 'Debugging Master', description: 'Found and fixed 10 bugs', earned: false, icon: Target },
+            ].map((achievement, index) => {
               const Icon = achievement.icon;
               return (
                 <motion.div

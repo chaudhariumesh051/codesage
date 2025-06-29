@@ -1,15 +1,13 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Send, Sparkles, MessageCircle, Code, Lightbulb, HelpCircle, Bot, Copy, Check, ArrowLeft } from 'lucide-react';
+import { Send, MessageCircle, Code, Bot, Copy, Check } from 'lucide-react';
 import { GeminiService } from '../services/gemini';
+import { useAuth } from './AuthProvider';
+import { supabase } from '../lib/supabase';
 
 // ============================================================================
 // TYPE DEFINITIONS
 // ============================================================================
-
-interface AIAssistantProps {
-  onClose: () => void;
-}
 
 interface ChatMessage {
   role: 'user' | 'assistant';
@@ -166,11 +164,12 @@ const MessageContent: React.FC<{ content: string; isUser: boolean }> = ({ conten
 // MAIN COMPONENT
 // ============================================================================
 
-export const AIAssistant: React.FC<AIAssistantProps> = ({ onClose }) => {
+export const AIAssistant: React.FC = () => {
   // ========================================================================
   // STATE MANAGEMENT
   // ========================================================================
   
+  const { user } = useAuth();
   const [message, setMessage] = useState('');
   const [messages, setMessages] = useState<ChatMessage[]>([
     {
@@ -181,6 +180,8 @@ export const AIAssistant: React.FC<AIAssistantProps> = ({ onClose }) => {
   ]);
   const [isLoading, setIsLoading] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const [chatHistory, setChatHistory] = useState<any[]>([]);
+  const [isLoadingHistory, setIsLoadingHistory] = useState(false);
 
   // ========================================================================
   // EFFECTS
@@ -191,32 +192,56 @@ export const AIAssistant: React.FC<AIAssistantProps> = ({ onClose }) => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, isLoading]);
 
-  // ========================================================================
-  // CONFIGURATION DATA
-  // ========================================================================
-  
-  const quickActions = [
-    { 
-      icon: Code, 
-      label: "Explain Code", 
-      action: "Can you explain how this code works step by step?" 
-    },
-    { 
-      icon: Lightbulb, 
-      label: "Optimize", 
-      action: "How can I optimize this code for better performance and readability?" 
-    },
-    { 
-      icon: HelpCircle, 
-      label: "Debug", 
-      action: "Help me find and fix bugs in my code" 
-    },
-    { 
-      icon: Sparkles, 
-      label: "Best Practices", 
-      action: "What are the best practices and coding standards for this code?" 
+  // Load chat history when component mounts
+  useEffect(() => {
+    if (user) {
+      loadChatHistory();
     }
-  ];
+  }, [user]);
+
+  // ========================================================================
+  // DATA FETCHING
+  // ========================================================================
+
+  const loadChatHistory = async () => {
+    try {
+      setIsLoadingHistory(true);
+      
+      const { data, error } = await supabase
+        .from('chat_history')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false })
+        .limit(10);
+        
+      if (error) {
+        throw error;
+      }
+      
+      setChatHistory(data || []);
+    } catch (error) {
+      console.error('Error loading chat history:', error);
+    } finally {
+      setIsLoadingHistory(false);
+    }
+  };
+
+  const saveChatMessage = async (message: ChatMessage) => {
+    try {
+      if (!user) return;
+      
+      await supabase
+        .from('chat_history')
+        .insert({
+          user_id: user.id,
+          role: message.role,
+          content: message.content,
+          created_at: message.timestamp.toISOString()
+        });
+    } catch (error) {
+      console.error('Error saving chat message:', error);
+    }
+  };
 
   // ========================================================================
   // EVENT HANDLERS
@@ -243,6 +268,9 @@ export const AIAssistant: React.FC<AIAssistantProps> = ({ onClose }) => {
     setMessage(''); // Clear input field
     setIsLoading(true); // Show loading state
 
+    // Save user message to database
+    await saveChatMessage(userMessage);
+
     try {
       // Call Gemini AI service with conversation history
       const response = await GeminiService.chatWithAssistant(newMessages);
@@ -256,6 +284,9 @@ export const AIAssistant: React.FC<AIAssistantProps> = ({ onClose }) => {
 
       // Add assistant response to conversation
       setMessages([...newMessages, assistantMessage]);
+      
+      // Save assistant message to database
+      await saveChatMessage(assistantMessage);
       
     } catch (error) {
       console.error('Chat error:', error);
@@ -273,14 +304,6 @@ export const AIAssistant: React.FC<AIAssistantProps> = ({ onClose }) => {
     } finally {
       setIsLoading(false); // Hide loading state
     }
-  };
-
-  /**
-   * Handles quick action button clicks
-   * Sets the message input to the predefined action text
-   */
-  const handleQuickAction = (action: string) => {
-    setMessage(action);
   };
 
   /**
@@ -305,16 +328,6 @@ export const AIAssistant: React.FC<AIAssistantProps> = ({ onClose }) => {
       {/* ================================================================ */}
       <div className="flex items-center justify-between p-6 border-b border-gray-200 dark:border-dark-700">
         <div className="flex items-center space-x-3">
-          {/* Back Button */}
-          <motion.button
-            whileHover={{ scale: 1.1 }}
-            whileTap={{ scale: 0.9 }}
-            onClick={onClose}
-            className="p-2 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 hover:bg-gray-100 dark:hover:bg-dark-700 rounded-lg transition-colors"
-          >
-            <ArrowLeft className="w-5 h-5" />
-          </motion.button>
-          
           {/* AI Assistant Icon */}
           <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-600 rounded-xl flex items-center justify-center">
             <Bot className="w-5 h-5 text-white" />
@@ -398,34 +411,6 @@ export const AIAssistant: React.FC<AIAssistantProps> = ({ onClose }) => {
           )}
         </AnimatePresence>
         <div ref={messagesEndRef} />
-      </div>
-
-      {/* ================================================================ */}
-      {/* QUICK ACTIONS SECTION */}
-      {/* ================================================================ */}
-      <div className="px-6 py-4 border-t border-gray-200 dark:border-dark-700">
-        <p className="text-sm text-gray-600 dark:text-gray-400 mb-3">
-          Quick actions:
-        </p>
-        <div className="grid grid-cols-2 gap-2">
-          {quickActions.map((action, index) => {
-            const Icon = action.icon;
-            return (
-              <motion.button
-                key={index}
-                whileHover={{ scale: 1.02 }}
-                whileTap={{ scale: 0.98 }}
-                onClick={() => handleQuickAction(action.action)}
-                className="flex items-center space-x-2 p-3 bg-gray-50 dark:bg-dark-700 rounded-xl hover:bg-gray-100 dark:hover:bg-dark-600 transition-colors text-left border border-gray-200 dark:border-dark-600"
-              >
-                <Icon className="w-4 h-4 text-blue-600 dark:text-blue-400" />
-                <span className="text-sm text-gray-700 dark:text-gray-300">
-                  {action.label}
-                </span>
-              </motion.button>
-            );
-          })}
-        </div>
       </div>
 
       {/* ================================================================ */}

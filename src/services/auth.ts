@@ -6,10 +6,7 @@ export interface AuthUser {
   email: string
   full_name?: string
   avatar_url?: string
-  role: 'free_user' | 'pro_user' | 'admin' | 'super_admin'
-  subscription_status: 'inactive' | 'active' | 'cancelled' | 'past_due' | 'trialing'
-  subscription_plan?: string
-  subscription_expires_at?: string
+  role: 'user' | 'admin'
 }
 
 export interface SignUpData {
@@ -107,74 +104,6 @@ export class AuthService {
   }
 
   /**
-   * Sign in with magic link
-   */
-  static async signInWithMagicLink(email: string) {
-    try {
-      const { error } = await supabase.auth.signInWithOtp({
-        email,
-        options: {
-          emailRedirectTo: `${window.location.origin}/auth/callback`
-        }
-      })
-
-      if (error) {
-        this.handleRateLimitError(error);
-      }
-
-      showToast.success('Magic link sent! Check your email.')
-    } catch (error) {
-      console.error('Magic link error:', error)
-      throw error
-    }
-  }
-
-  /**
-   * Sign in with OTP (SMS)
-   */
-  static async signInWithOTP(phone: string) {
-    try {
-      const { error } = await supabase.auth.signInWithOtp({
-        phone,
-        options: {
-          channel: 'sms'
-        }
-      })
-
-      if (error) {
-        throw error
-      }
-
-      showToast.success('OTP sent to your phone!')
-    } catch (error) {
-      console.error('OTP error:', error)
-      throw error
-    }
-  }
-
-  /**
-   * Verify OTP
-   */
-  static async verifyOTP(phone: string, token: string) {
-    try {
-      const { data, error } = await supabase.auth.verifyOtp({
-        phone,
-        token,
-        type: 'sms'
-      })
-
-      if (error) {
-        throw error
-      }
-
-      return data.user
-    } catch (error) {
-      console.error('OTP verification error:', error)
-      throw error
-    }
-  }
-
-  /**
    * Sign out
    */
   static async signOut() {
@@ -266,10 +195,7 @@ export class AuthService {
         email: user.email!,
         full_name: profile.full_name,
         avatar_url: profile.avatar_url,
-        role: profile.role,
-        subscription_status: profile.subscription_status,
-        subscription_plan: profile.subscription_plan,
-        subscription_expires_at: profile.subscription_expires_at
+        role: profile.is_admin ? 'admin' : 'user'
       }
     } catch (error) {
       console.error('Error getting current user:', error)
@@ -304,65 +230,6 @@ export class AuthService {
     } catch (error) {
       console.error('Profile update error:', error)
       throw error
-    }
-  }
-
-  /**
-   * Check if user can use a feature
-   */
-  static async canUseFeature(feature: string): Promise<boolean> {
-    try {
-      const { data: { user } } = await supabase.auth.getUser()
-      
-      if (!user) {
-        return false
-      }
-
-      const limits = {
-        code_analysis: 3,
-        problem_solving: 3,
-        video_generation: 0 // Pro only
-      }
-
-      const { data, error } = await supabase.rpc('check_rate_limit', {
-        user_id_param: user.id,
-        feature_type: feature,
-        max_count: limits[feature as keyof typeof limits] || 0
-      })
-
-      if (error) {
-        console.error('Error checking rate limit:', error)
-        return false
-      }
-
-      return data
-    } catch (error) {
-      console.error('Error checking feature access:', error)
-      return false
-    }
-  }
-
-  /**
-   * Increment usage count for a feature
-   */
-  static async incrementUsage(feature: string) {
-    try {
-      const { data: { user } } = await supabase.auth.getUser()
-      
-      if (!user) {
-        return
-      }
-
-      const { error } = await supabase.rpc('increment_usage_count', {
-        user_id_param: user.id,
-        feature_type: feature
-      })
-
-      if (error) {
-        console.error('Error incrementing usage:', error)
-      }
-    } catch (error) {
-      console.error('Error incrementing usage:', error)
     }
   }
 
@@ -464,6 +331,83 @@ export class AuthService {
     } catch (error) {
       console.error('Error fetching security logs:', error)
       return []
+    }
+  }
+
+  /**
+   * Get all users (admin only)
+   */
+  static async getAllUsers() {
+    try {
+      const { data: { user } } = await supabase.auth.getUser()
+      
+      if (!user) {
+        throw new Error('Not authenticated')
+      }
+
+      // Check if user is admin
+      const { data: profile, error: profileError } = await supabase
+        .from('user_profiles')
+        .select('is_admin')
+        .eq('id', user.id)
+        .single()
+
+      if (profileError || !profile.is_admin) {
+        throw new Error('Unauthorized: Admin access required')
+      }
+
+      // Get all users
+      const { data, error } = await supabase
+        .from('user_profiles')
+        .select('*')
+        .order('created_at', { ascending: false })
+
+      if (error) {
+        throw error
+      }
+
+      return data || []
+    } catch (error) {
+      console.error('Error fetching all users:', error)
+      throw error
+    }
+  }
+
+  /**
+   * Delete user (admin only)
+   */
+  static async deleteUser(userId: string) {
+    try {
+      const { data: { user } } = await supabase.auth.getUser()
+      
+      if (!user) {
+        throw new Error('Not authenticated')
+      }
+
+      // Check if user is admin
+      const { data: profile, error: profileError } = await supabase
+        .from('user_profiles')
+        .select('is_admin')
+        .eq('id', user.id)
+        .single()
+
+      if (profileError || !profile.is_admin) {
+        throw new Error('Unauthorized: Admin access required')
+      }
+
+      // Delete user using admin API
+      const { error } = await supabase.functions.invoke('admin-delete-user', {
+        body: { userId }
+      })
+
+      if (error) {
+        throw error
+      }
+
+      return true
+    } catch (error) {
+      console.error('Error deleting user:', error)
+      throw error
     }
   }
 }
