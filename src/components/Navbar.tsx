@@ -67,7 +67,7 @@ export const Navbar: React.FC<NavbarProps> = ({
               </div>
               <div className="hidden md:block">
                 <h1 className="text-xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
-                  CodeSage
+                  CodeOrbit
                 </h1>
                 <p className="text-xs text-gray-500 dark:text-gray-400">AI Code Platform</p>
               </div>

@@ -174,7 +174,7 @@ export const AIAssistant: React.FC = () => {
   const [messages, setMessages] = useState<ChatMessage[]>([
     {
       role: 'assistant',
-      content: "Hi! I'm **CodeSage AI**, powered by Google's Gemini 2.0 Flash. I'm your intelligent coding assistant and can help you:\n\n• **Understand code** - Explain how code works\n• **Debug issues** - Find and fix bugs\n• **Optimize performance** - Suggest improvements\n• **Learn concepts** - Explain programming topics\n• **Code review** - Analyze code quality\n\nWhat would you like to work on today?",
+      content: "Hi! I'm **CodeOrbit AI**, powered by Google's Gemini 2.0 Flash. I'm your intelligent coding assistant and can help you:\n\n• **Understand code** - Explain how code works\n• **Debug issues** - Find and fix bugs\n• **Optimize performance** - Suggest improvements\n• **Learn concepts** - Explain programming topics\n• **Code review** - Analyze code quality\n\nWhat would you like to work on today?",
       timestamp: new Date()
     }
   ]);
@@ -336,7 +336,7 @@ export const AIAssistant: React.FC = () => {
           {/* Title and Subtitle */}
           <div>
             <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100">
-              CodeSage AI
+              CodeOrbit AI
             </h2>
             <p className="text-sm text-gray-600 dark:text-gray-400">
               Powered by Gemini 2.0 Flash • Code formatting enabled

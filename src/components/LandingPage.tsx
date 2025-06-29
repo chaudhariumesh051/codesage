@@ -110,7 +110,7 @@ export const LandingPage: React.FC = () => {
       name: "Sarah Chen",
       role: "Software Engineer at Google",
       content:
-        "CodeSage transformed how I understand complex algorithms. The AI video explanations are incredibly helpful!",
+        "CodeOrbit transformed how I understand complex algorithms. The AI video explanations are incredibly helpful!",
       avatar:
         "https://images.unsplash.com/photo-1494790108755-2616b612b786?w=64&h=64&fit=crop&crop=face",
     },
@@ -173,7 +173,7 @@ export const LandingPage: React.FC = () => {
             <Brain className="w-6 h-6 text-white" />
           </div>
           <span className="text-2xl font-bold bg-gradient-to-r from-blue-400 to-purple-400 bg-clip-text text-transparent">
-            CodeSage
+            CodeOrbit
           </span>
         </motion.div>
 
@@ -365,7 +365,7 @@ export const LandingPage: React.FC = () => {
             </h2>
             <p className="text-xl text-gray-300 max-w-3xl mx-auto">
               Join thousands of developers who've transformed their coding
-              journey with CodeSage
+              journey with CodeOrbit
             </p>
           </motion.div>
 
@@ -425,7 +425,7 @@ export const LandingPage: React.FC = () => {
               </span>
             </h2>
             <p className="text-xl text-gray-300 mb-12 max-w-2xl mx-auto">
-              Join thousands of developers who are already using CodeSage to
+              Join thousands of developers who are already using CodeOrbit to
               understand, debug, and master their code with AI-powered insights.
             </p>
 
@@ -461,7 +461,7 @@ export const LandingPage: React.FC = () => {
                 <Brain className="w-5 h-5 text-white" />
               </div>
               <span className="text-xl font-bold bg-gradient-to-r from-blue-400 to-purple-400 bg-clip-text text-transparent">
-                CodeSage
+                CodeOrbit
               </span>
             </div>
             <div className="flex items-center space-x-6 text-gray-400">
@@ -481,7 +481,7 @@ export const LandingPage: React.FC = () => {
           </div>
           <div className="mt-8 pt-8 border-t border-gray-800 text-center text-gray-400">
             <p>
-              &copy; 2025 CodeSage. All rights reserved. Powered by AI
+              &copy; 2025 CodeOrbit. All rights reserved. Powered by AI
               innovation.
             </p>
           </div>

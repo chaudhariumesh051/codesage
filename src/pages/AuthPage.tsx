@@ -501,8 +501,8 @@ export const AuthPage: React.FC = () => {
                mode === 'signup' ? 'Create Account' : 'Reset Password'}
             </h1>
             <p className="text-blue-300">
-              {mode === 'signin' ? 'Sign in to your CodeSage account' :
-               mode === 'signup' ? 'Join CodeSage and start learning' :
+              {mode === 'signin' ? 'Sign in to your CodeOrbit account' :
+               mode === 'signup' ? 'Join CodeOrbit and start learning' :
                'We\'ll send you a reset link to your email'}
             </p>
           </div>
